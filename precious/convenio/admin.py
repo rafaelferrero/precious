@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
+from django.db.models import Q
 from .models import (
     Prestador,
     Convenio,
@@ -87,6 +88,13 @@ class ConvenioAdmin(admin.ModelAdmin):
 
 @admin.register(DetalleArancel)
 class DetalleArancelAdmin(admin.ModelAdmin):
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "arancel_prestador":
+            kwargs["queryset"] = ArancelPractica.objects.exclude(prestador__nombre="GECROS")
+        if db_field.name == "arancel_homologado":
+            kwargs["queryset"] = ArancelPractica.objects.filter(prestador__nombre="GECROS")
+        return super(DetalleArancelAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
+
     actions_on_bottom = True
     fieldsets = (
         (None, {
@@ -114,6 +122,13 @@ class DetalleArancelAdmin(admin.ModelAdmin):
 
 @admin.register(DetalleCodigo)
 class DetalleCodigoAdmin(admin.ModelAdmin):
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "codigo_prestador":
+            kwargs["queryset"] = CodigoPractica.objects.exclude(prestador__nombre="GECROS")
+        if db_field.name == "codigo_homologado":
+            kwargs["queryset"] = CodigoPractica.objects.filter(prestador__nombre="GECROS")
+        return super(DetalleCodigoAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
+
     actions_on_bottom = True
     fieldsets = (
         (None, {

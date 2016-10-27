@@ -44,9 +44,10 @@ class CodigoPractica(Practica):
     )
 
     def __str__(self):
-        return "{0} - {1}".format(
+        return "{0} - {1} - {2}".format(
             self.codigo,
-            self.nombre
+            self.nombre,
+            self.prestador,
         )
 
     class Meta:
@@ -62,8 +63,9 @@ class ArancelPractica(Practica):
     )
 
     def __str__(self):
-        return "{0}".format(
-            self.nombre
+        return "{0} - {1}".format(
+            self.nombre,
+            self.prestador,
         )
 
     class Meta:
