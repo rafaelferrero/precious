@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Prestador, Convenio, DetalleArancel, DetalleCodigo
+from django.utils.translation import ugettext_lazy as _
+from .models import (
+    Prestador,
+    Convenio,
+    ArancelPractica,
+    CodigoPractica,
+    DetalleArancel,
+    DetalleCodigo,
+)
 
 
 @admin.register(Prestador)
@@ -7,6 +15,66 @@ class PrestadorAdmin(admin.ModelAdmin):
     actions_on_bottom = True
     list_display = ('nombre',)
     search_fields = ('nombre',)
+
+
+@admin.register(ArancelPractica)
+class ArancelPracticaAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    fieldsets = (
+        (None, {
+            'fields': (
+                'nombre',
+                'prestador',
+            )
+        }),
+        (_("Ampliar Detalles"), {
+            'classes': ('collapse',),
+            'fields': ('detalle',),
+        })
+    )
+    list_display = (
+        'nombre',
+        'prestador',
+    )
+    list_filter = (
+        'prestador',
+    )
+    search_fields = (
+        'nombre',
+        'prestador',
+        'descripcion',
+    )
+
+
+@admin.register(CodigoPractica)
+class CodigoPracticaAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    fieldsets = (
+        (None, {
+            'fields': (
+                'codigo',
+                'nombre',
+                'prestador',
+            )
+        }),
+        (_("Ampliar Detalles"), {
+            'classes': ('collapse',),
+            'fields': ('detalle',),
+        })
+    )
+    list_display = (
+        'codigo',
+        'nombre',
+        'prestador',
+    )
+    list_filter = (
+        'prestador',
+    )
+    search_fields = (
+        'codigo',
+        'nombre',
+        'descripcion',
+    )
 
 
 @admin.register(Convenio)
