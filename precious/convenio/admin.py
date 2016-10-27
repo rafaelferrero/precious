@@ -8,6 +8,7 @@ from .models import (
     CodigoPractica,
     DetalleArancel,
     DetalleCodigo,
+    SubirExcelCodigos,
 )
 
 
@@ -152,3 +153,8 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
+
+
+@admin.register(SubirExcelCodigos)
+class SubirExcelCodigosAdmin(admin.ModelAdmin):
+    pass

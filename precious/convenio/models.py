@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+import django_excel as excel
 
 
 class Prestador(models.Model):
@@ -156,4 +157,26 @@ class DetalleCodigo(Detalle):
             self.convenio,
             self.codigo_prestador,
             self.codigo_homologado
+        )
+
+
+class SubirExcelCodigos(models.Model):
+    archivo = models.FileField()
+    prestador = models.ForeignKey(Prestador)
+
+    def __str__(self):
+        return "{0} - {1}".format(
+            self.prestador,
+            self.archivo,
+        )
+
+    def save(self, *args, **kwargs):
+        super(SubirExcelCodigos, self).save(*args, **kwargs)
+        filename = self.archivo.url
+        filename.save_book_to_database(
+            models=[CodigoPractica, ],
+            initializers=[self.prestador, ],
+            mapdicts=[
+                ['prestador', 'codigo', 'nombre'],
+            ]
         )
