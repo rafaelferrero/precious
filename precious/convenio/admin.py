@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
-from django.db.models import Q
 from .models import (
     Prestador,
     Convenio,
@@ -75,7 +74,7 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
     search_fields = (
         'codigo',
         'nombre',
-        'descripcion',
+        'detalle',
     )
 
 

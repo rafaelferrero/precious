@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
-import django_excel as excel
+import pyexcel as pe
+import pdb
 
 
 class Prestador(models.Model):
@@ -163,6 +164,17 @@ class DetalleCodigo(Detalle):
 class SubirExcelCodigos(models.Model):
     archivo = models.FileField()
     prestador = models.ForeignKey(Prestador)
+    fila_titulo = models.BooleanField(default=True)
+    columna_codigo = models.IntegerField(
+        default=0
+    )
+    columna_nombre = models.IntegerField(
+        default=1
+    )
+    columna_detalle = models.IntegerField(
+        null=True,
+        blank=True,
+    )
 
     def __str__(self):
         return "{0} - {1}".format(
@@ -172,11 +184,27 @@ class SubirExcelCodigos(models.Model):
 
     def save(self, *args, **kwargs):
         super(SubirExcelCodigos, self).save(*args, **kwargs)
-        filename = self.archivo.url
-        filename.save_book_to_database(
-            models=[CodigoPractica, ],
-            initializers=[self.prestador, ],
-            mapdicts=[
-                ['prestador', 'codigo', 'nombre'],
-            ]
-        )
+        # pdb.set_trace()
+        records = iter(
+            pe.get_sheet(
+                file_name=self.archivo.path))
+
+        if self.fila_titulo:
+            next(records)
+
+        for r in records:
+            codigo = r[self.columna_codigo]
+            nombre = r[self.columna_nombre]
+
+            if self.columna_detalle and len(r) > 2:
+                detalle = r[self.columna_detalle]
+            else:
+                detalle = ""
+
+            q = CodigoPractica(
+                prestador=self.prestador,
+                codigo=codigo,
+                nombre=nombre,
+                detalle=detalle)
+
+            q.save()
