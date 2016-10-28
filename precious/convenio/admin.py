@@ -130,6 +130,10 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
         return super(DetalleCodigoAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
 
     actions_on_bottom = True
+    raw_id_fields = (
+        'codigo_prestador',
+        'codigo_homologado',
+    )
     fieldsets = (
         (None, {
             'fields': (
