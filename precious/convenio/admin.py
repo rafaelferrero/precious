@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from .models import (
     Prestador,
     Convenio,
@@ -8,7 +10,27 @@ from .models import (
     DetalleArancel,
     DetalleCodigo,
     SubirExcelCodigos,
+    Usuario,
 )
+import pdb
+
+
+# Define an inline admin descriptor for Employee model
+# which acts a bit like a singleton
+class UsuarioInline(admin.StackedInline):
+    model = Usuario
+    can_delete = False
+    verbose_name_plural = 'usuarios'
+
+
+# Define a new User admin
+class UserAdmin(BaseUserAdmin):
+    inlines = (UsuarioInline, )
+
+
+# Re-register UserAdmin
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
 
 
 @admin.register(Prestador)
@@ -122,13 +144,6 @@ class DetalleArancelAdmin(admin.ModelAdmin):
 
 @admin.register(DetalleCodigo)
 class DetalleCodigoAdmin(admin.ModelAdmin):
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "codigo_prestador":
-            kwargs["queryset"] = CodigoPractica.objects.exclude(prestador__nombre="GECROS")
-        if db_field.name == "codigo_homologado":
-            kwargs["queryset"] = CodigoPractica.objects.filter(prestador__nombre="GECROS")
-        return super(DetalleCodigoAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
-
     actions_on_bottom = True
     raw_id_fields = (
         'codigo_prestador',
@@ -158,6 +173,18 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     )
 
 
+def get_nombre_prestador(request):
+    u = User.objects.get(username=request.user)
+    return u.usuario.prestador.nombre
+
+
 @admin.register(SubirExcelCodigos)
 class SubirExcelCodigosAdmin(admin.ModelAdmin):
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "prestador":
+            kwargs["queryset"] = Prestador.objects.exclude(
+                nombre=get_nombre_prestador(request))
+        return super(SubirExcelCodigosAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
     pass
+
+

@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth.models import User
 import pyexcel as pe
 import pdb
 
@@ -159,6 +160,14 @@ class DetalleCodigo(Detalle):
             self.codigo_prestador,
             self.codigo_homologado
         )
+
+
+class Usuario(models.Model):
+    usuario = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE
+    )
+    prestador = models.ForeignKey(Prestador)
 
 
 class SubirExcelCodigos(models.Model):
