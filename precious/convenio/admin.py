@@ -108,13 +108,21 @@ class ConvenioAdmin(admin.ModelAdmin):
     date_hierarchy = 'fecha_inicio'
 
 
+def get_nombre_prestador(request):
+    u = User.objects.get(username=request.user)
+    return u.usuario.prestador.nombre
+
+
 @admin.register(DetalleArancel)
 class DetalleArancelAdmin(admin.ModelAdmin):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        # Como los aranceles no son tantos como los codigos dejo el select pero filtrados
         if db_field.name == "arancel_prestador":
-            kwargs["queryset"] = ArancelPractica.objects.exclude(prestador__nombre="GECROS")
+            kwargs["queryset"] = ArancelPractica.objects.exclude(
+                prestador__nombre=get_nombre_prestador(request))
         if db_field.name == "arancel_homologado":
-            kwargs["queryset"] = ArancelPractica.objects.filter(prestador__nombre="GECROS")
+            kwargs["queryset"] = ArancelPractica.objects.filter(
+                prestador__nombre=get_nombre_prestador(request))
         return super(DetalleArancelAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
 
     actions_on_bottom = True
@@ -145,6 +153,7 @@ class DetalleArancelAdmin(admin.ModelAdmin):
 @admin.register(DetalleCodigo)
 class DetalleCodigoAdmin(admin.ModelAdmin):
     actions_on_bottom = True
+    # como son tantos los códigos se pone raw en vez del select por default
     raw_id_fields = (
         'codigo_prestador',
         'codigo_homologado',
@@ -173,18 +182,8 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     )
 
 
-def get_nombre_prestador(request):
-    u = User.objects.get(username=request.user)
-    return u.usuario.prestador.nombre
-
-
 @admin.register(SubirExcelCodigos)
 class SubirExcelCodigosAdmin(admin.ModelAdmin):
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "prestador":
-            kwargs["queryset"] = Prestador.objects.exclude(
-                nombre=get_nombre_prestador(request))
-        return super(SubirExcelCodigosAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
     pass
 
 
