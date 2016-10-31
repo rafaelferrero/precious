@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 import pyexcel as pe
 import pdb
 
@@ -55,6 +56,7 @@ class CodigoPractica(Practica):
 
     class Meta:
         ordering = ('codigo', 'prestador',)
+        # unique_together = ('codigo', 'prestador',)
         verbose_name = _("Código de Práctica")
         verbose_name_plural = _("Códigos de Prácticas")
 
@@ -171,19 +173,44 @@ class Usuario(models.Model):
 
 
 class SubirExcelCodigos(models.Model):
+    TIPOS_ARCHIVO = (
+        ('C', _("Códigos de Nomenclador del Prestador")),
+        ('H', _("Homologación de Códigos de Nomenclador")),
+    )
     archivo = models.FileField()
+    tipo_archivo = models.CharField(
+        max_length=15,
+        verbose_name=_("Tipo de Archivo"),
+        choices=TIPOS_ARCHIVO,
+        default=TIPOS_ARCHIVO[0][0]
+    )
     prestador = models.ForeignKey(Prestador)
-    fila_titulo = models.BooleanField(default=True)
+    fila_titulo = models.BooleanField(
+        default=True,
+        verbose_name=_("La primer fila contiene los títulos de las columnas"),
+    )
     columna_codigo = models.IntegerField(
-        default=0
+        default=0,
+        verbose_name=_("Columna de Códigos de Nomenclador del Prestador"),
     )
     columna_nombre = models.IntegerField(
-        default=1
+        default=1,
+        verbose_name=_("Columna de nombres de los Códigos de Nomenclador"),
     )
     columna_detalle = models.IntegerField(
         null=True,
         blank=True,
+        verbose_name=_("Columna de Detalles de los Códigos de Nomenclador"),
     )
+    columna_codigo_homologado = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Columna de Código Homologado"),
+    )
+
+    class Meta:
+        verbose_name = _("Subir archivo en formato Excel (.xls)")
+        verbose_name_plural = _("Subir archivos en formato Excel (.xls)")
 
     def __str__(self):
         return "{0} - {1}".format(
@@ -191,16 +218,18 @@ class SubirExcelCodigos(models.Model):
             self.archivo,
         )
 
-    def save(self, *args, **kwargs):
-        super(SubirExcelCodigos, self).save(*args, **kwargs)
+    def clean(self):
         # pdb.set_trace()
-        records = iter(
-            pe.get_sheet(
-                file_name=self.archivo.path))
+        if self.tipo_archivo == 'H':
+            if self.columna_codigo_homologado is None \
+                    or self.columna_codigo_homologado < 0:
+                raise ValidationError(
+                    {'columna_codigo_homologado':
+                        _("ERROR! Ud. a Indicado subir un archivo de "
+                            "'Homologación de Códigos de Nomenclador' y no ha indicado cuál "
+                            "es la 'Columna de Código Homologado'")})
 
-        if self.fila_titulo:
-            next(records)
-
+    def subir_codigos_prestador(self, records):
         for r in records:
             codigo = r[self.columna_codigo]
             nombre = r[self.columna_nombre]
@@ -210,10 +239,40 @@ class SubirExcelCodigos(models.Model):
             else:
                 detalle = ""
 
-            q = CodigoPractica(
+            obj, created = CodigoPractica.objects.get_or_create(
                 prestador=self.prestador,
                 codigo=codigo,
                 nombre=nombre,
                 detalle=detalle)
 
-            q.save()
+            if not created:
+                print(obj)
+
+    def subir_homologacion_codigos(self, records):
+        for r in records:
+            # pdb.set_trace()
+            codigo = r[self.columna_codigo]
+            homologado = r[self.columna_codigo_homologado]
+
+            obj, created = DetalleCodigo.objects.get_or_create(
+                convenio=self.prestador.convenio,
+                codigo_prestador=codigo,
+                codigo_homologado=homologado,
+                )
+
+            if not created:
+                print(obj)
+
+    def save(self, *args, **kwargs):
+        super(SubirExcelCodigos, self).save(*args, **kwargs)
+        records = iter(
+            pe.get_sheet(
+                file_name=self.archivo.path))
+
+        if self.fila_titulo:
+            next(records)
+
+        if self.tipo_archivo == 'C':
+            self.subir_codigos_prestador(records)
+        elif self.tipo_archivo == 'H':
+            self.subir_homologacion_codigos(records)
