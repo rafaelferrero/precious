@@ -1,7 +1,11 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import (
+    ValidationError,
+    ObjectDoesNotExist,
+    MultipleObjectsReturned,
+)
 import pyexcel as pe
 import pdb
 
@@ -37,7 +41,30 @@ class Practica(models.Model):
         verbose_name_plural = _("Prácticas")
 
 
+class TipoPractica(models.Model):
+    tipo = models.CharField(
+        max_length=255,
+        verbose_name=_("Tipo de Práctica"),
+        null=True,
+        blank=True,
+    )
+    prestador = models.ForeignKey(Prestador)
+
+    def __str__(self):
+        return self.tipo
+
+    class Meta:
+        verbose_name = _("Tipo de Práctica")
+        verbose_name_plural = _("Tipos de Prácticas")
+
+
 class CodigoPractica(Practica):
+    tipo = models.ForeignKey(
+        TipoPractica,
+        null=True,
+        blank=True,
+        verbose_name=_("Tipo de Práctica")
+    )
     codigo = models.CharField(
         max_length=10,
         verbose_name=_("Código de Práctica")
@@ -185,6 +212,20 @@ class SubirExcelCodigos(models.Model):
         default=TIPOS_ARCHIVO[0][0]
     )
     prestador = models.ForeignKey(Prestador)
+    creator = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="creador"
+    )
+    updater = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="modificador",
+    )
     fila_titulo = models.BooleanField(
         default=True,
         verbose_name=_("La primer fila contiene los títulos de las columnas"),
@@ -196,6 +237,11 @@ class SubirExcelCodigos(models.Model):
     columna_nombre = models.IntegerField(
         default=1,
         verbose_name=_("Columna de nombres de los Códigos de Nomenclador"),
+    )
+    columna_tipo = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Columna de Tipo de Práctica del Prestador"),
     )
     columna_detalle = models.IntegerField(
         null=True,
@@ -233,35 +279,83 @@ class SubirExcelCodigos(models.Model):
         for r in records:
             codigo = r[self.columna_codigo]
             nombre = r[self.columna_nombre]
-
             if self.columna_detalle and len(r) > 2:
                 detalle = r[self.columna_detalle]
             else:
                 detalle = ""
 
-            obj, created = CodigoPractica.objects.get_or_create(
-                prestador=self.prestador,
-                codigo=codigo,
-                nombre=nombre,
-                detalle=detalle)
+            t = None
+            if self.columna_tipo:
+                try:
+                    t = TipoPractica.objects.get(
+                        tipo=r[self.columna_tipo],
+                        prestador=self.prestador,
+                    )
+                except ObjectDoesNotExist:
+                    TipoPractica.objects.create(
+                        tipo=r[self.columna_tipo],
+                        prestador=self.prestador,
+                    )
+                    t = TipoPractica.objects.get(
+                        tipo=r[self.columna_tipo],
+                        prestador=self.prestador,
+                    )
+                except MultipleObjectsReturned:
+                    print("Tipos de Prácticas repetidos encontrados para un mismo prestador:")
+                    print(tipo_nombre)
+                    t = TipoPractica.objects.filter(
+                        tipo=r[self.columna_tipo],
+                        prestador=self.prestador,
+                    ).get()
 
-            if not created:
-                print(obj)
+            try:
+                c = CodigoPractica.objects.get(
+                    prestador=self.prestador,
+                    tipo=t,
+                    codigo=codigo,
+                )
+            except ObjectDoesNotExist:
+                CodigoPractica.objects.create(
+                    prestador=self.prestador,
+                    tipo=t,
+                    codigo=codigo,
+                    nombre=nombre,
+                    detalle=detalle)
+            except MultipleObjectsReturned:
+                print("Códigos repetidos encontrados en un mismo prestador:")
+                print(c)
+            else:
+                print("Error!! Código repetido {0}-{1}".format(codigo, nombre))
 
     def subir_homologacion_codigos(self, records):
         for r in records:
-            # pdb.set_trace()
-            codigo = r[self.columna_codigo]
-            homologado = r[self.columna_codigo_homologado]
-
-            obj, created = DetalleCodigo.objects.get_or_create(
-                convenio=self.prestador.convenio,
-                codigo_prestador=codigo,
-                codigo_homologado=homologado,
+            pdb.set_trace()
+            try:
+                codigo = CodigoPractica.objects.get(
+                    prestador=self.prestador,
+                    codigo=r[self.columna_codigo],
+                    tipo=r[self.columna_tipo],
                 )
+            except ObjectDoesNotExist:
+                print("Codigo: {0}".format(r[self.columna_codigo]))
+                codigo = None
 
-            if not created:
-                print(obj)
+            try:
+                homologado = CodigoPractica.objects.get(
+                    prestador=self.updater.usuario.prestador,
+                    codigo=r[self.columna_codigo_homologado])
+            except ObjectDoesNotExist:
+                print("Homologado: {0}".format(r[self.columna_codigo_homologado]))
+                homologado = None
+
+            if codigo and homologado:
+                DetalleCodigo.objects.create(
+                    convenio=self.prestador.convenio,
+                    codigo_prestador=codigo,
+                    codigo_homologado=homologado,
+                )
+            else:
+                print("Creado False: {0}".format(codigo))
 
     def save(self, *args, **kwargs):
         super(SubirExcelCodigos, self).save(*args, **kwargs)

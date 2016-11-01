@@ -11,6 +11,7 @@ from .models import (
     DetalleCodigo,
     SubirExcelCodigos,
     Usuario,
+    TipoPractica,
 )
 import pdb
 
@@ -31,6 +32,22 @@ class UserAdmin(BaseUserAdmin):
 # Re-register UserAdmin
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+
+
+@admin.register(TipoPractica)
+class TipoPracticaAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    list_display = (
+        'tipo',
+        'prestador',
+    )
+    search_fields = (
+        'tipo',
+        'prestador',
+    )
+    list_filter = (
+        'prestador',
+    )
 
 
 @admin.register(Prestador)
@@ -75,6 +92,7 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             'fields': (
+                'tipo',
                 'codigo',
                 'nombre',
                 'prestador',
@@ -86,12 +104,14 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
         })
     )
     list_display = (
+        'tipo',
         'codigo',
         'nombre',
         'prestador',
     )
     list_filter = (
         'prestador',
+        'tipo',
     )
     search_fields = (
         'codigo',
@@ -184,6 +204,23 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
 
 @admin.register(SubirExcelCodigos)
 class SubirExcelCodigosAdmin(admin.ModelAdmin):
-    pass
+    actions_on_bottom = True
+    list_display = (
+        'archivo',
+        'tipo_archivo',
+        'prestador',
+        'fila_titulo',
+        'columna_codigo',
+        'columna_nombre',
+        'columna_detalle',
+        'columna_codigo_homologado',
+    )
+    exclude = ('creator', 'updater')
+
+    def save_model(self, request, obj, form, change):
+        if getattr(obj, 'creator', None) is None:
+            obj.creator = request.user
+        obj.updater = request.user
+        obj.save()
 
 
