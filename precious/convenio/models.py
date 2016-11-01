@@ -250,6 +250,14 @@ class ImportarPracticas(SubirExcel):
         related_name="ImportarPracticas_modificador",
     )
 
+    def clen(self):
+        if self.columna_tipo is None \
+                or self.columna_tipo < 0:
+            raise ValidationError(
+                {'columna_tipo':
+                 _("ERROR! Ud. NO ha indicado una columna de 'Tipo de Practica' "
+                   "la cual es necesaria para la unicidad de prácticas")})
+
     def subir_codigos_prestador(self, records):
         for r in records:
             codigo = r[self.columna_codigo]
@@ -318,8 +326,11 @@ class ImportarPracticas(SubirExcel):
 
 
 class ImportarHomologacion(SubirExcel):
+    columna_tipo_homologado = models.IntegerField(
+        verbose_name=_("Columna de Tipo de Práctica Homologada"),
+    )
     columna_codigo_homologado = models.IntegerField(
-        verbose_name=_("Columna de Código Homologado"),
+        verbose_name=_("Columna de Código de Práctica Homologada"),
     )
     creator = models.ForeignKey(
         User,
@@ -341,24 +352,29 @@ class ImportarHomologacion(SubirExcel):
         verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
 
     def clean(self):
-        if self.tipo_archivo == 'H':
-            if self.columna_codigo_homologado is None \
-                    or self.columna_codigo_homologado < 0:
-                raise ValidationError(
-                    {'columna_codigo_homologado':
-                        _("ERROR! Ud. a Indicado subir un archivo de "
-                            "'Homologación de Códigos de Nomenclador' y no ha indicado cuál "
-                            "es la 'Columna de Código Homologado'")})
-            if self.columna_tipo is None \
-                    or self.columna_tipo < 0:
-                raise ValidationError(
-                    {'columna_tipo':
-                            _("ERROR! Ud. NO ha indicado una columna de 'Tipo de Practica' "
-                              "la cual es necesaria para la unicidad de prácticas")})
+        if self.columna_tipo_homologado is None \
+                or self.columna_tipo_homologado < 0:
+            raise ValidationError(
+                {'columna_tipo_homologado':
+                    _("ERROR! Ud. a Indicado subir un archivo de "
+                        "'Homologación de Códigos de Nomenclador' y no ha indicado cuál "
+                        "es la 'Columna de Tipo de Práctica Homologada'")})
+        if self.columna_codigo_homologado is None \
+                or self.columna_codigo_homologado < 0:
+            raise ValidationError(
+                {'columna_codigo_homologado':
+                    _("ERROR! Ud. a Indicado subir un archivo de "
+                        "'Homologación de Códigos de Nomenclador' y no ha indicado cuál "
+                        "es la 'Columna de Código Homologado'")})
+        if self.columna_tipo is None \
+                or self.columna_tipo < 0:
+            raise ValidationError(
+                {'columna_tipo':
+                    _("ERROR! Ud. NO ha indicado una columna de 'Tipo de Practica' "
+                      "la cual es necesaria para la unicidad de prácticas")})
 
     def subir_homologacion_codigos(self, records):
         for r in records:
-            pdb.set_trace()
             if self.columna_tipo is not None:
                 try:
                     t = TipoPractica.objects.get(
