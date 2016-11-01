@@ -9,7 +9,8 @@ from .models import (
     CodigoPractica,
     DetalleArancel,
     DetalleCodigo,
-    SubirExcelCodigos,
+    ImportarPracticas,
+    ImportarHomologacion,
     Usuario,
     TipoPractica,
 )
@@ -202,18 +203,12 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(SubirExcelCodigos)
-class SubirExcelCodigosAdmin(admin.ModelAdmin):
+@admin.register(ImportarPracticas)
+class ImportarPracticasAdmin(admin.ModelAdmin):
     actions_on_bottom = True
     list_display = (
         'archivo',
-        'tipo_archivo',
         'prestador',
-        'fila_titulo',
-        'columna_codigo',
-        'columna_nombre',
-        'columna_detalle',
-        'columna_codigo_homologado',
     )
     exclude = ('creator', 'updater')
 
@@ -223,4 +218,19 @@ class SubirExcelCodigosAdmin(admin.ModelAdmin):
         obj.updater = request.user
         obj.save()
 
+
+@admin.register(ImportarHomologacion)
+class ImportarHomologacionAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    list_display = (
+        'archivo',
+        'prestador',
+    )
+    exclude = ('creator', 'updater')
+
+    def save_model(self, request, obj, form, change):
+        if getattr(obj, 'creator', None) is None:
+            obj.creator = request.user
+        obj.updater = request.user
+        obj.save()
 

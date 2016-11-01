@@ -27,7 +27,7 @@ class Prestador(models.Model):
 
 class Practica(models.Model):
     prestador = models.ForeignKey(Prestador)
-    detalle = models.TextField(
+    observacion = models.TextField(
         max_length=2000,
         verbose_name=_("Observaciones"),
         null=True,
@@ -199,64 +199,33 @@ class Usuario(models.Model):
     prestador = models.ForeignKey(Prestador)
 
 
-class SubirExcelCodigos(models.Model):
-    TIPOS_ARCHIVO = (
-        ('C', _("Códigos de Nomenclador del Prestador")),
-        ('H', _("Homologación de Códigos de Nomenclador")),
-    )
+class SubirExcel(models.Model):
     archivo = models.FileField()
-    tipo_archivo = models.CharField(
-        max_length=15,
-        verbose_name=_("Tipo de Archivo"),
-        choices=TIPOS_ARCHIVO,
-        default=TIPOS_ARCHIVO[0][0]
-    )
     prestador = models.ForeignKey(Prestador)
-    creator = models.ForeignKey(
-        User,
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name="creador"
-    )
-    updater = models.ForeignKey(
-        User,
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name="modificador",
-    )
     fila_titulo = models.BooleanField(
         default=True,
         verbose_name=_("La primer fila contiene los títulos de las columnas"),
     )
-    columna_codigo = models.IntegerField(
+    columna_tipo = models.IntegerField(
         default=0,
-        verbose_name=_("Columna de Códigos de Nomenclador del Prestador"),
+        verbose_name=_("Columna de 'Tipo de Práctica'"),
+    )
+    columna_codigo = models.IntegerField(
+        default=1,
+        verbose_name=_("Columna de 'Códigos de Prácticas'"),
     )
     columna_nombre = models.IntegerField(
-        default=1,
-        verbose_name=_("Columna de nombres de los Códigos de Nomenclador"),
+        default=2,
+        verbose_name=_("Columna de 'Nombres de las Prácticas'"),
     )
-    columna_tipo = models.IntegerField(
+    columna_observaciones = models.IntegerField(
         null=True,
         blank=True,
-        verbose_name=_("Columna de Tipo de Práctica del Prestador"),
-    )
-    columna_detalle = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name=_("Columna de Detalles de los Códigos de Nomenclador"),
-    )
-    columna_codigo_homologado = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name=_("Columna de Código Homologado"),
+        verbose_name=_("Columna de las 'Observaciones de las Prácticas'"),
     )
 
     class Meta:
-        verbose_name = _("Subir archivo en formato Excel (.xls)")
-        verbose_name_plural = _("Subir archivos en formato Excel (.xls)")
+        abstract = True
 
     def __str__(self):
         return "{0} - {1}".format(
@@ -264,28 +233,34 @@ class SubirExcelCodigos(models.Model):
             self.archivo,
         )
 
-    def clean(self):
-        # pdb.set_trace()
-        if self.tipo_archivo == 'H':
-            if self.columna_codigo_homologado is None \
-                    or self.columna_codigo_homologado < 0:
-                raise ValidationError(
-                    {'columna_codigo_homologado':
-                        _("ERROR! Ud. a Indicado subir un archivo de "
-                            "'Homologación de Códigos de Nomenclador' y no ha indicado cuál "
-                            "es la 'Columna de Código Homologado'")})
+
+class ImportarPracticas(SubirExcel):
+    creator = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="ImportarPracticas_creador"
+    )
+    updater = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="ImportarPracticas_modificador",
+    )
 
     def subir_codigos_prestador(self, records):
         for r in records:
             codigo = r[self.columna_codigo]
             nombre = r[self.columna_nombre]
-            if self.columna_detalle and len(r) > 2:
-                detalle = r[self.columna_detalle]
+            if self.columna_observaciones and len(r) > 2:
+                obs = r[self.columna_observaciones]
             else:
-                detalle = ""
+                obs = ""
 
             t = None
-            if self.columna_tipo:
+            if self.columna_tipo is not None:
                 try:
                     t = TipoPractica.objects.get(
                         tipo=r[self.columna_tipo],
@@ -301,8 +276,8 @@ class SubirExcelCodigos(models.Model):
                         prestador=self.prestador,
                     )
                 except MultipleObjectsReturned:
-                    print("Tipos de Prácticas repetidos encontrados para un mismo prestador:")
-                    print(tipo_nombre)
+                    print("Tipos de Prácticas repetidos encontrados para "
+                          "un mismo prestador: {0}".format(tipo_nombre))
                     t = TipoPractica.objects.filter(
                         tipo=r[self.columna_tipo],
                         prestador=self.prestador,
@@ -320,30 +295,105 @@ class SubirExcelCodigos(models.Model):
                     tipo=t,
                     codigo=codigo,
                     nombre=nombre,
-                    detalle=detalle)
+                    observacion=obs)
             except MultipleObjectsReturned:
-                print("Códigos repetidos encontrados en un mismo prestador:")
-                print(c)
+                print("Códigos repetidos encontrados en un mismo prestador: {0}".format(c))
             else:
                 print("Error!! Código repetido {0}-{1}".format(codigo, nombre))
+
+    class Meta:
+        verbose_name = _("Importar Prácticas en formato Excel (.xls)")
+        verbose_name_plural = _("Importar Prácticas en formato Excel (.xls)")
+
+    def save(self, *args, **kwargs):
+        super(ImportarPracticas, self).save(*args, **kwargs)
+        records = iter(
+            pe.get_sheet(
+                file_name=self.archivo.path))
+
+        if self.fila_titulo:
+            next(records)
+
+        self.subir_codigos_prestador(records)
+
+
+class ImportarHomologacion(SubirExcel):
+    columna_codigo_homologado = models.IntegerField(
+        verbose_name=_("Columna de Código Homologado"),
+    )
+    creator = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="ImportarHomologacion_creador"
+    )
+    updater = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="ImportarHomologacion_modificador",
+    )
+
+    class Meta:
+        verbose_name = _("Importar Homologación en formato Excel (.xls)")
+        verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
+
+    def clean(self):
+        if self.tipo_archivo == 'H':
+            if self.columna_codigo_homologado is None \
+                    or self.columna_codigo_homologado < 0:
+                raise ValidationError(
+                    {'columna_codigo_homologado':
+                        _("ERROR! Ud. a Indicado subir un archivo de "
+                            "'Homologación de Códigos de Nomenclador' y no ha indicado cuál "
+                            "es la 'Columna de Código Homologado'")})
+            if self.columna_tipo is None \
+                    or self.columna_tipo < 0:
+                raise ValidationError(
+                    {'columna_tipo':
+                            _("ERROR! Ud. NO ha indicado una columna de 'Tipo de Practica' "
+                              "la cual es necesaria para la unicidad de prácticas")})
 
     def subir_homologacion_codigos(self, records):
         for r in records:
             pdb.set_trace()
+            if self.columna_tipo is not None:
+                try:
+                    t = TipoPractica.objects.get(
+                        tipo=r[self.columna_tipo],
+                        prestador=self.prestador,
+                    )
+                except ObjectDoesNotExist:
+                    raise ValidationError(
+                        "ERROR! No se encuentra el tipo indicado {0}".format(r[self.columna_tipo]))
+
             try:
                 codigo = CodigoPractica.objects.get(
                     prestador=self.prestador,
                     codigo=r[self.columna_codigo],
-                    tipo=r[self.columna_tipo],
+                    tipo=t,
                 )
             except ObjectDoesNotExist:
                 print("Codigo: {0}".format(r[self.columna_codigo]))
                 codigo = None
 
+            if self.columna_tipo is not None:
+                try:
+                    t = TipoPractica.objects.get(
+                        tipo=r[self.columna_tipo],
+                        prestador=self.prestador,
+                    )
+                except ObjectDoesNotExist:
+                    raise ValidationError(
+                        "ERROR! No se encuentra el tipo indicado {0}".format(r[self.columna_tipo]))
             try:
                 homologado = CodigoPractica.objects.get(
                     prestador=self.updater.usuario.prestador,
-                    codigo=r[self.columna_codigo_homologado])
+                    codigo=r[self.columna_codigo_homologado],
+                    tipo=t,
+                )
             except ObjectDoesNotExist:
                 print("Homologado: {0}".format(r[self.columna_codigo_homologado]))
                 homologado = None
@@ -356,17 +406,3 @@ class SubirExcelCodigos(models.Model):
                 )
             else:
                 print("Creado False: {0}".format(codigo))
-
-    def save(self, *args, **kwargs):
-        super(SubirExcelCodigos, self).save(*args, **kwargs)
-        records = iter(
-            pe.get_sheet(
-                file_name=self.archivo.path))
-
-        if self.fila_titulo:
-            next(records)
-
-        if self.tipo_archivo == 'C':
-            self.subir_codigos_prestador(records)
-        elif self.tipo_archivo == 'H':
-            self.subir_homologacion_codigos(records)
