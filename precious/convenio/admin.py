@@ -38,13 +38,12 @@ admin.site.register(User, UserAdmin)
 @admin.register(TipoPractica)
 class TipoPracticaAdmin(admin.ModelAdmin):
     actions_on_bottom = True
-    list_display = (
-        'tipo',
-        'prestador',
-    )
     search_fields = (
         'tipo',
         'prestador',
+    )
+    list_display = (
+        'texto_completo',
     )
     list_filter = (
         'prestador',
@@ -70,12 +69,8 @@ class ArancelPracticaAdmin(admin.ModelAdmin):
         }),
         (_("Ampliar Detalles"), {
             'classes': ('collapse',),
-            'fields': ('detalle',),
+            'fields': ('observacion',),
         })
-    )
-    list_display = (
-        'nombre',
-        'prestador',
     )
     list_filter = (
         'prestador',
@@ -101,14 +96,8 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
         }),
         (_("Ampliar Detalles"), {
             'classes': ('collapse',),
-            'fields': ('detalle',),
+            'fields': ('observacion',),
         })
-    )
-    list_display = (
-        'tipo',
-        'codigo',
-        'nombre',
-        'prestador',
     )
     list_filter = (
         'prestador',
@@ -117,7 +106,7 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
     search_fields = (
         'codigo',
         'nombre',
-        'detalle',
+        'observacion',
     )
 
 

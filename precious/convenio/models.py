@@ -50,8 +50,28 @@ class TipoPractica(models.Model):
     )
     prestador = models.ForeignKey(Prestador)
 
+    @property
+    def solo_nombre(self):
+        if self.tipo:
+            return self.tipo
+        else:
+            return "[Sin Tipo]"
+
+    @property
+    def texto_completo(self):
+        if self.tipo:
+            texto = _("{0} - {1}").format(
+                self.tipo,
+                self.prestador,
+            )
+        else:
+            texto = _("[Sin Tipo] - {0}").format(
+                self.prestador,
+            )
+        return texto
+
     def __str__(self):
-        return self.tipo
+        return self.solo_nombre
 
     class Meta:
         verbose_name = _("Tipo de Práctica")
@@ -75,7 +95,8 @@ class CodigoPractica(Practica):
     )
 
     def __str__(self):
-        return "{0} - {1} - {2}".format(
+        return "{0} - {1} - {2} - {3}".format(
+            self.tipo,
             self.codigo,
             self.nombre,
             self.prestador,
@@ -95,10 +116,7 @@ class ArancelPractica(Practica):
     )
 
     def __str__(self):
-        return "{0} - {1}".format(
-            self.nombre,
-            self.prestador,
-        )
+        return self.nombre
 
     class Meta:
         verbose_name = _("Arancel de Práctica")
@@ -209,6 +227,7 @@ class SubirExcel(models.Model):
     columna_tipo = models.IntegerField(
         default=0,
         verbose_name=_("Columna de 'Tipo de Práctica'"),
+        help_text=_("Aunque sea una columna vacía la misma debe existir.")
     )
     columna_codigo = models.IntegerField(
         default=1,
