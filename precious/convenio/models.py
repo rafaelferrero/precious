@@ -394,7 +394,8 @@ class ImportarHomologacion(SubirExcel):
 
     def subir_homologacion_codigos(self, records):
         for r in records:
-            if self.columna_tipo is not None:
+            if r[self.columna_codigo_homologado] is not None \
+                    and r[self.columna_codigo_homologado] != "":
                 try:
                     t = TipoPractica.objects.get(
                         tipo=r[self.columna_tipo],
@@ -404,40 +405,51 @@ class ImportarHomologacion(SubirExcel):
                     raise ValidationError(
                         "ERROR! No se encuentra el tipo indicado {0}".format(r[self.columna_tipo]))
 
-            try:
-                codigo = CodigoPractica.objects.get(
-                    prestador=self.prestador,
-                    codigo=r[self.columna_codigo],
-                    tipo=t,
-                )
-            except ObjectDoesNotExist:
-                print("Codigo: {0}".format(r[self.columna_codigo]))
-                codigo = None
-
-            if self.columna_tipo is not None:
                 try:
-                    t = TipoPractica.objects.get(
-                        tipo=r[self.columna_tipo],
+                    codigo = CodigoPractica.objects.get(
                         prestador=self.prestador,
+                        codigo=r[self.columna_codigo],
+                        tipo=t,
                     )
                 except ObjectDoesNotExist:
+                    print("Codigo: {0}".format(r[self.columna_codigo]))
+                    codigo = None
+
+                try:
+                    t = TipoPractica.objects.get(
+                        tipo=r[self.columna_tipo_homologado],
+                        prestador=self.updater.usuario.prestador,
+                    )
+                except ObjectDoesNotExist:
+                    pdb.set_trace()
                     raise ValidationError(
                         "ERROR! No se encuentra el tipo indicado {0}".format(r[self.columna_tipo]))
-            try:
-                homologado = CodigoPractica.objects.get(
-                    prestador=self.updater.usuario.prestador,
-                    codigo=r[self.columna_codigo_homologado],
-                    tipo=t,
-                )
-            except ObjectDoesNotExist:
-                print("Homologado: {0}".format(r[self.columna_codigo_homologado]))
-                homologado = None
+                try:
+                    homologado = CodigoPractica.objects.get(
+                        prestador=self.updater.usuario.prestador,
+                        codigo=r[self.columna_codigo_homologado],
+                        tipo=t,
+                    )
+                except ObjectDoesNotExist:
+                    print("Homologado: {0}".format(r[self.columna_codigo_homologado]))
+                    homologado = None
 
-            if codigo and homologado:
-                DetalleCodigo.objects.create(
-                    convenio=self.prestador.convenio,
-                    codigo_prestador=codigo,
-                    codigo_homologado=homologado,
-                )
-            else:
-                print("Creado False: {0}".format(codigo))
+                if codigo and homologado:
+                    DetalleCodigo.objects.create(
+                        convenio=self.prestador.convenio,
+                        codigo_prestador=codigo,
+                        codigo_homologado=homologado,
+                    )
+                else:
+                    print("Creado False: {0}".format(codigo))
+
+    def save(self, *args, **kwargs):
+        super(ImportarHomologacion, self).save(*args, **kwargs)
+        records = iter(
+            pe.get_sheet(
+                file_name=self.archivo.path))
+
+        if self.fila_titulo:
+            next(records)
+
+        self.subir_homologacion_codigos(records)
