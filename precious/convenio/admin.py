@@ -9,8 +9,10 @@ from .models import (
     CodigoPractica,
     DetalleArancel,
     DetalleCodigo,
-    SubirExcelCodigos,
+    ImportarPracticas,
+    ImportarHomologacion,
     Usuario,
+    TipoPractica,
 )
 import pdb
 
@@ -33,6 +35,21 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
+@admin.register(TipoPractica)
+class TipoPracticaAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    search_fields = (
+        'tipo',
+        'prestador',
+    )
+    list_display = (
+        'texto_completo',
+    )
+    list_filter = (
+        'prestador',
+    )
+
+
 @admin.register(Prestador)
 class PrestadorAdmin(admin.ModelAdmin):
     actions_on_bottom = True
@@ -52,12 +69,8 @@ class ArancelPracticaAdmin(admin.ModelAdmin):
         }),
         (_("Ampliar Detalles"), {
             'classes': ('collapse',),
-            'fields': ('detalle',),
+            'fields': ('observacion',),
         })
-    )
-    list_display = (
-        'nombre',
-        'prestador',
     )
     list_filter = (
         'prestador',
@@ -75,6 +88,7 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             'fields': (
+                'tipo',
                 'codigo',
                 'nombre',
                 'prestador',
@@ -82,21 +96,17 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
         }),
         (_("Ampliar Detalles"), {
             'classes': ('collapse',),
-            'fields': ('detalle',),
+            'fields': ('observacion',),
         })
-    )
-    list_display = (
-        'codigo',
-        'nombre',
-        'prestador',
     )
     list_filter = (
         'prestador',
+        'tipo',
     )
     search_fields = (
         'codigo',
         'nombre',
-        'detalle',
+        'observacion',
     )
 
 
@@ -182,8 +192,34 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(SubirExcelCodigos)
-class SubirExcelCodigosAdmin(admin.ModelAdmin):
-    pass
+@admin.register(ImportarPracticas)
+class ImportarPracticasAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    list_display = (
+        'archivo',
+        'prestador',
+    )
+    exclude = ('creator', 'updater')
 
+    def save_model(self, request, obj, form, change):
+        if getattr(obj, 'creator', None) is None:
+            obj.creator = request.user
+        obj.updater = request.user
+        obj.save()
+
+
+@admin.register(ImportarHomologacion)
+class ImportarHomologacionAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    list_display = (
+        'archivo',
+        'prestador',
+    )
+    exclude = ('creator', 'updater')
+
+    def save_model(self, request, obj, form, change):
+        if getattr(obj, 'creator', None) is None:
+            obj.creator = request.user
+        obj.updater = request.user
+        obj.save()
 
