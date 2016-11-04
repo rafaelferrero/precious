@@ -11,13 +11,14 @@ from convenio.models import (
     TipoPractica,
     CodigoPractica,
     DetalleCodigo,
+    Convenio,
 )
 import pyexcel as pe
+import pdb
 
 
 class SubirExcel(models.Model):
     archivo = models.FileField()
-    prestador = models.ForeignKey(Prestador)
     fila_titulo = models.BooleanField(
         default=True,
         verbose_name=_("La primer fila contiene los títulos de las columnas"),
@@ -41,17 +42,12 @@ class SubirExcel(models.Model):
         verbose_name=_("Columna de las 'Observaciones de las Prácticas'"),
     )
 
-    def __str__(self):
-        return "{0} - {1}".format(
-            self.prestador,
-            self.archivo,
-        )
-
     class Meta:
         abstract = True
 
 
 class ImportarPracticas(SubirExcel):
+    prestador = models.ForeignKey(Prestador)
     creator = models.ForeignKey(
         User,
         blank=True,
@@ -66,6 +62,12 @@ class ImportarPracticas(SubirExcel):
         on_delete=models.SET_NULL,
         related_name="ImportarPracticas_modificador",
     )
+
+    def __str__(self):
+        return "{0} - {1}".format(
+            self.archivo,
+            self.prestador,
+        )
 
     def clen(self):
         if self.columna_tipo is None \
@@ -133,6 +135,7 @@ class ImportarPracticas(SubirExcel):
 
 
 class ImportarHomologacion(SubirExcel):
+    convenio = models.ForeignKey(Convenio)
     columna_tipo_homologado = models.IntegerField(
         verbose_name=_("Columna de Tipo de Práctica Homologada"),
     )
@@ -153,6 +156,12 @@ class ImportarHomologacion(SubirExcel):
         on_delete=models.SET_NULL,
         related_name="ImportarHomologacion_modificador",
     )
+
+    def __str__(self):
+        return "{0} - {1}".format(
+            self.archivo,
+            self.convenio,
+        )
 
     def clean(self):
         if self.columna_tipo_homologado is None \
@@ -179,9 +188,10 @@ class ImportarHomologacion(SubirExcel):
     def subir_homologacion_codigos(self, records):
         for r in records:
             try:
+                # pdb.set_trace()
                 t = TipoPractica.objects.get(
                     tipo=r[self.columna_tipo],
-                    prestador=self.prestador,
+                    prestador=self.convenio.prestador,
                 )
             except ObjectDoesNotExist:
                 raise ValidationError(
@@ -189,7 +199,7 @@ class ImportarHomologacion(SubirExcel):
 
             try:
                 codigo = CodigoPractica.objects.get(
-                    prestador=self.prestador,
+                    prestador=self.convenio.prestador,
                     codigo=r[self.columna_codigo],
                     tipo=t,
                 )
@@ -222,7 +232,7 @@ class ImportarHomologacion(SubirExcel):
             if codigo:
                 try:
                     obj, created = DetalleCodigo.objects.get_or_create(
-                        convenio=self.prestador.convenio,
+                        convenio=self.convenio,
                         codigo_prestador=codigo,
                         codigo_homologado=homologado,
                     )
