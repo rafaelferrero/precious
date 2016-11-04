@@ -9,10 +9,9 @@ from .models import (
     CodigoPractica,
     DetalleArancel,
     DetalleCodigo,
-    SubirExcelCodigos,
     Usuario,
+    TipoPractica,
 )
-import pdb
 
 
 # Define an inline admin descriptor for Employee model
@@ -31,6 +30,21 @@ class UserAdmin(BaseUserAdmin):
 # Re-register UserAdmin
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+
+
+@admin.register(TipoPractica)
+class TipoPracticaAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    search_fields = (
+        'tipo',
+        'prestador',
+    )
+    list_display = (
+        'texto_completo',
+    )
+    list_filter = (
+        'prestador',
+    )
 
 
 @admin.register(Prestador)
@@ -52,12 +66,8 @@ class ArancelPracticaAdmin(admin.ModelAdmin):
         }),
         (_("Ampliar Detalles"), {
             'classes': ('collapse',),
-            'fields': ('detalle',),
+            'fields': ('observacion',),
         })
-    )
-    list_display = (
-        'nombre',
-        'prestador',
     )
     list_filter = (
         'prestador',
@@ -75,6 +85,7 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             'fields': (
+                'tipo',
                 'codigo',
                 'nombre',
                 'prestador',
@@ -82,21 +93,17 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
         }),
         (_("Ampliar Detalles"), {
             'classes': ('collapse',),
-            'fields': ('detalle',),
+            'fields': ('observacion',),
         })
-    )
-    list_display = (
-        'codigo',
-        'nombre',
-        'prestador',
     )
     list_filter = (
         'prestador',
+        'tipo',
     )
     search_fields = (
         'codigo',
         'nombre',
-        'detalle',
+        'observacion',
     )
 
 
@@ -180,10 +187,3 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
-
-
-@admin.register(SubirExcelCodigos)
-class SubirExcelCodigosAdmin(admin.ModelAdmin):
-    pass
-
-

@@ -1,8 +1,6 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
-import pyexcel as pe
-import pdb
 
 
 class Prestador(models.Model):
@@ -22,7 +20,7 @@ class Prestador(models.Model):
 
 class Practica(models.Model):
     prestador = models.ForeignKey(Prestador)
-    detalle = models.TextField(
+    observacion = models.TextField(
         max_length=2000,
         verbose_name=_("Observaciones"),
         null=True,
@@ -36,7 +34,51 @@ class Practica(models.Model):
         verbose_name_plural = _("Prácticas")
 
 
+class TipoPractica(models.Model):
+    tipo = models.CharField(
+        max_length=255,
+        verbose_name=_("Tipo de Práctica"),
+        null=True,
+        blank=True,
+    )
+    prestador = models.ForeignKey(Prestador)
+
+    @property
+    def solo_nombre(self):
+        if self.tipo:
+            return self.tipo
+        else:
+            return "[Sin Tipo]"
+
+    @property
+    def texto_completo(self):
+        if self.tipo:
+            texto = _("{0} - {1}").format(
+                self.tipo,
+                self.prestador,
+            )
+        else:
+            texto = _("[Sin Tipo] - {0}").format(
+                self.prestador,
+            )
+        return texto
+
+    def __str__(self):
+        return self.solo_nombre
+
+    class Meta:
+        unique_together = ('tipo', 'prestador',)
+        verbose_name = _("Tipo de Práctica")
+        verbose_name_plural = _("Tipos de Prácticas")
+
+
 class CodigoPractica(Practica):
+    tipo = models.ForeignKey(
+        TipoPractica,
+        null=True,
+        blank=True,
+        verbose_name=_("Tipo de Práctica")
+    )
     codigo = models.CharField(
         max_length=10,
         verbose_name=_("Código de Práctica")
@@ -47,7 +89,8 @@ class CodigoPractica(Practica):
     )
 
     def __str__(self):
-        return "{0} - {1} - {2}".format(
+        return "{0} - {1} - {2} - {3}".format(
+            self.tipo,
             self.codigo,
             self.nombre,
             self.prestador,
@@ -55,6 +98,7 @@ class CodigoPractica(Practica):
 
     class Meta:
         ordering = ('codigo', 'prestador',)
+        unique_together = ('tipo', 'codigo', 'prestador',)
         verbose_name = _("Código de Práctica")
         verbose_name_plural = _("Códigos de Prácticas")
 
@@ -66,10 +110,7 @@ class ArancelPractica(Practica):
     )
 
     def __str__(self):
-        return "{0} - {1}".format(
-            self.nombre,
-            self.prestador,
-        )
+        return self.nombre
 
     class Meta:
         verbose_name = _("Arancel de Práctica")
@@ -122,17 +163,17 @@ class DetalleArancel(Detalle):
         verbose_name=_("Arancel Homologado"),
     )
 
-    class Meta:
-        ordering = ('convenio', 'arancel_prestador',)
-        verbose_name = _("Detalle de Convenio de Aranceles de Práctica")
-        verbose_name_plural = _("Detalles de Convenio de Aranceles de Práctica")
-
     def __str__(self):
         return "{0} - {1} homologa a {1}".format(
             self.convenio,
             self.arancel_prestador,
             self.arancel_homologado
         )
+
+    class Meta:
+        ordering = ('convenio', 'arancel_prestador',)
+        verbose_name = _("Detalle de Convenio de Aranceles de Práctica")
+        verbose_name_plural = _("Detalles de Convenio de Aranceles de Práctica")
 
 
 class DetalleCodigo(Detalle):
@@ -143,16 +184,12 @@ class DetalleCodigo(Detalle):
     )
     codigo_homologado = models.ForeignKey(
         CodigoPractica,
+        default=None,
         blank=True,
         null=True,
         related_name='codigo_homologado',
         verbose_name=_("Código Homologado")
     )
-
-    class Meta:
-        ordering = ('convenio', 'codigo_prestador',)
-        verbose_name = _("Detalle de Convenio de Códigos de Práctica")
-        verbose_name_plural = _("Detalles de Convenio de Códigos de Práctica")
 
     def __str__(self):
         return "{0} - {1} homologa a {1}".format(
@@ -160,6 +197,11 @@ class DetalleCodigo(Detalle):
             self.codigo_prestador,
             self.codigo_homologado
         )
+
+    class Meta:
+        ordering = ('convenio', 'codigo_prestador',)
+        verbose_name = _("Detalle de Convenio de Códigos de Práctica")
+        verbose_name_plural = _("Detalles de Convenio de Códigos de Práctica")
 
 
 class Usuario(models.Model):
@@ -170,50 +212,3 @@ class Usuario(models.Model):
     prestador = models.ForeignKey(Prestador)
 
 
-class SubirExcelCodigos(models.Model):
-    archivo = models.FileField()
-    prestador = models.ForeignKey(Prestador)
-    fila_titulo = models.BooleanField(default=True)
-    columna_codigo = models.IntegerField(
-        default=0
-    )
-    columna_nombre = models.IntegerField(
-        default=1
-    )
-    columna_detalle = models.IntegerField(
-        null=True,
-        blank=True,
-    )
-
-    def __str__(self):
-        return "{0} - {1}".format(
-            self.prestador,
-            self.archivo,
-        )
-
-    def save(self, *args, **kwargs):
-        super(SubirExcelCodigos, self).save(*args, **kwargs)
-        # pdb.set_trace()
-        records = iter(
-            pe.get_sheet(
-                file_name=self.archivo.path))
-
-        if self.fila_titulo:
-            next(records)
-
-        for r in records:
-            codigo = r[self.columna_codigo]
-            nombre = r[self.columna_nombre]
-
-            if self.columna_detalle and len(r) > 2:
-                detalle = r[self.columna_detalle]
-            else:
-                detalle = ""
-
-            q = CodigoPractica(
-                prestador=self.prestador,
-                codigo=codigo,
-                nombre=nombre,
-                detalle=detalle)
-
-            q.save()
