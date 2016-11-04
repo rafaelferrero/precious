@@ -74,6 +74,7 @@ class TipoPractica(models.Model):
         return self.solo_nombre
 
     class Meta:
+        unique_together = ('tipo', 'prestador',)
         verbose_name = _("Tipo de Práctica")
         verbose_name_plural = _("Tipos de Prácticas")
 
@@ -104,7 +105,7 @@ class CodigoPractica(Practica):
 
     class Meta:
         ordering = ('codigo', 'prestador',)
-        # unique_together = ('codigo', 'prestador',)
+        unique_together = ('tipo', 'codigo', 'prestador',)
         verbose_name = _("Código de Práctica")
         verbose_name_plural = _("Códigos de Prácticas")
 
@@ -169,17 +170,17 @@ class DetalleArancel(Detalle):
         verbose_name=_("Arancel Homologado"),
     )
 
-    class Meta:
-        ordering = ('convenio', 'arancel_prestador',)
-        verbose_name = _("Detalle de Convenio de Aranceles de Práctica")
-        verbose_name_plural = _("Detalles de Convenio de Aranceles de Práctica")
-
     def __str__(self):
         return "{0} - {1} homologa a {1}".format(
             self.convenio,
             self.arancel_prestador,
             self.arancel_homologado
         )
+
+    class Meta:
+        ordering = ('convenio', 'arancel_prestador',)
+        verbose_name = _("Detalle de Convenio de Aranceles de Práctica")
+        verbose_name_plural = _("Detalles de Convenio de Aranceles de Práctica")
 
 
 class DetalleCodigo(Detalle):
@@ -190,16 +191,12 @@ class DetalleCodigo(Detalle):
     )
     codigo_homologado = models.ForeignKey(
         CodigoPractica,
+        default=None,
         blank=True,
         null=True,
         related_name='codigo_homologado',
         verbose_name=_("Código Homologado")
     )
-
-    class Meta:
-        ordering = ('convenio', 'codigo_prestador',)
-        verbose_name = _("Detalle de Convenio de Códigos de Práctica")
-        verbose_name_plural = _("Detalles de Convenio de Códigos de Práctica")
 
     def __str__(self):
         return "{0} - {1} homologa a {1}".format(
@@ -207,6 +204,11 @@ class DetalleCodigo(Detalle):
             self.codigo_prestador,
             self.codigo_homologado
         )
+
+    class Meta:
+        ordering = ('convenio', 'codigo_prestador',)
+        verbose_name = _("Detalle de Convenio de Códigos de Práctica")
+        verbose_name_plural = _("Detalles de Convenio de Códigos de Práctica")
 
 
 class Usuario(models.Model):
@@ -243,14 +245,14 @@ class SubirExcel(models.Model):
         verbose_name=_("Columna de las 'Observaciones de las Prácticas'"),
     )
 
-    class Meta:
-        abstract = True
-
     def __str__(self):
         return "{0} - {1}".format(
             self.prestador,
             self.archivo,
         )
+
+    class Meta:
+        abstract = True
 
 
 class ImportarPracticas(SubirExcel):
@@ -289,48 +291,34 @@ class ImportarPracticas(SubirExcel):
             t = None
             if self.columna_tipo is not None:
                 try:
-                    t = TipoPractica.objects.get(
-                        tipo=r[self.columna_tipo],
-                        prestador=self.prestador,
-                    )
-                except ObjectDoesNotExist:
-                    TipoPractica.objects.create(
-                        tipo=r[self.columna_tipo],
-                        prestador=self.prestador,
-                    )
-                    t = TipoPractica.objects.get(
+                    t, created = TipoPractica.objects.get_or_create(
                         tipo=r[self.columna_tipo],
                         prestador=self.prestador,
                     )
                 except MultipleObjectsReturned:
                     print("Tipos de Prácticas repetidos encontrados para "
-                          "un mismo prestador: {0}".format(tipo_nombre))
+                          "un mismo prestador: {0}".format(r[self.columna_tipo]))
+                    print(t)
                     t = TipoPractica.objects.filter(
                         tipo=r[self.columna_tipo],
                         prestador=self.prestador,
-                    ).get()
+                    ).first()
 
             try:
-                c = CodigoPractica.objects.get(
+                obj, created = CodigoPractica.objects.get_or_create(
                     prestador=self.prestador,
                     tipo=t,
                     codigo=codigo,
+                    defaults={
+                        'nombre': nombre,
+                        'observacion': obs
+                    },
                 )
-            except ObjectDoesNotExist:
-                CodigoPractica.objects.create(
-                    prestador=self.prestador,
-                    tipo=t,
-                    codigo=codigo,
-                    nombre=nombre,
-                    observacion=obs)
+                if not created:
+                    print("Error!! Código repetido {0}-{1}".format(codigo, nombre))
+                    print(obj)
             except MultipleObjectsReturned:
-                print("Códigos repetidos encontrados en un mismo prestador: {0}".format(c))
-            else:
-                print("Error!! Código repetido {0}-{1}".format(codigo, nombre))
-
-    class Meta:
-        verbose_name = _("Importar Prácticas en formato Excel (.xls)")
-        verbose_name_plural = _("Importar Prácticas en formato Excel (.xls)")
+                print("Códigos repetidos encontrados en un mismo prestador: {0}".format(codigo))
 
     def save(self, *args, **kwargs):
         super(ImportarPracticas, self).save(*args, **kwargs)
@@ -342,6 +330,10 @@ class ImportarPracticas(SubirExcel):
             next(records)
 
         self.subir_codigos_prestador(records)
+
+    class Meta:
+        verbose_name = _("Importar Prácticas en formato Excel (.xls)")
+        verbose_name_plural = _("Importar Prácticas en formato Excel (.xls)")
 
 
 class ImportarHomologacion(SubirExcel):
@@ -365,10 +357,6 @@ class ImportarHomologacion(SubirExcel):
         on_delete=models.SET_NULL,
         related_name="ImportarHomologacion_modificador",
     )
-
-    class Meta:
-        verbose_name = _("Importar Homologación en formato Excel (.xls)")
-        verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
 
     def clean(self):
         if self.columna_tipo_homologado is None \
@@ -394,36 +382,36 @@ class ImportarHomologacion(SubirExcel):
 
     def subir_homologacion_codigos(self, records):
         for r in records:
+            try:
+                t = TipoPractica.objects.get(
+                    tipo=r[self.columna_tipo],
+                    prestador=self.prestador,
+                )
+            except ObjectDoesNotExist:
+                raise ValidationError(
+                    "ERROR! No se encuentra el tipo indicado: {0}".format(r[self.columna_tipo]))
+
+            try:
+                codigo = CodigoPractica.objects.get(
+                    prestador=self.prestador,
+                    codigo=r[self.columna_codigo],
+                    tipo=t,
+                )
+            except ObjectDoesNotExist:
+                print("ERROR! No se encuentra el Código indicado: {0}".format(r[self.columna_codigo]))
+                codigo = None
+
             if r[self.columna_codigo_homologado] is not None \
                     and r[self.columna_codigo_homologado] != "":
-                try:
-                    t = TipoPractica.objects.get(
-                        tipo=r[self.columna_tipo],
-                        prestador=self.prestador,
-                    )
-                except ObjectDoesNotExist:
-                    raise ValidationError(
-                        "ERROR! No se encuentra el tipo indicado {0}".format(r[self.columna_tipo]))
-
-                try:
-                    codigo = CodigoPractica.objects.get(
-                        prestador=self.prestador,
-                        codigo=r[self.columna_codigo],
-                        tipo=t,
-                    )
-                except ObjectDoesNotExist:
-                    print("Codigo: {0}".format(r[self.columna_codigo]))
-                    codigo = None
-
                 try:
                     t = TipoPractica.objects.get(
                         tipo=r[self.columna_tipo_homologado],
                         prestador=self.updater.usuario.prestador,
                     )
                 except ObjectDoesNotExist:
-                    pdb.set_trace()
                     raise ValidationError(
-                        "ERROR! No se encuentra el tipo indicado {0}".format(r[self.columna_tipo]))
+                        "ERROR! No se encuentra el tipo indicado: {0}".format(r[self.columna_tipo]))
+
                 try:
                     homologado = CodigoPractica.objects.get(
                         prestador=self.updater.usuario.prestador,
@@ -432,16 +420,21 @@ class ImportarHomologacion(SubirExcel):
                     )
                 except ObjectDoesNotExist:
                     print("Homologado: {0}".format(r[self.columna_codigo_homologado]))
-                    homologado = None
+            else:
+                homologado = None
 
-                if codigo and homologado:
-                    DetalleCodigo.objects.create(
+            if codigo:
+                try:
+                    obj, created = DetalleCodigo.objects.get_or_create(
                         convenio=self.prestador.convenio,
                         codigo_prestador=codigo,
                         codigo_homologado=homologado,
                     )
-                else:
-                    print("Creado False: {0}".format(codigo))
+                    if not created:
+                        print("Error!! Código repetido {0}-{1}".format(codigo, homologado))
+                        print(obj)
+                except MultipleObjectsReturned:
+                    print("ERROR!! Códigos repetidos encontrados en un mismo convenio: {0}".format(codigo))
 
     def save(self, *args, **kwargs):
         super(ImportarHomologacion, self).save(*args, **kwargs)
@@ -453,3 +446,7 @@ class ImportarHomologacion(SubirExcel):
             next(records)
 
         self.subir_homologacion_codigos(records)
+
+    class Meta:
+        verbose_name = _("Importar Homologación en formato Excel (.xls)")
+        verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
