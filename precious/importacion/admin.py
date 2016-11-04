@@ -26,7 +26,7 @@ class ImportarHomologacionAdmin(admin.ModelAdmin):
     actions_on_bottom = True
     list_display = (
         'archivo',
-        'prestador',
+        'convenio',
     )
     exclude = ('creator', 'updater')
 
