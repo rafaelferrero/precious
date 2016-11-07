@@ -2,7 +2,35 @@ from django.contrib import admin
 from .models import (
     ImportarPracticas,
     ImportarHomologacion,
+    ErrorImportacionPractica,
+    ErrorImportacionHomologacion,
 )
+
+
+@admin.register(ErrorImportacionPractica)
+class ErrorImportacionPracticaAdmin(admin.ModelAdmin):
+    list_display = (
+        'mensaje_error',
+        'tipo_practica',
+        'codigo_practica',
+        'nombre_practica',
+        'obs_practica',
+        'prestador',
+    )
+
+
+@admin.register(ErrorImportacionHomologacion)
+class ErrorImportacionHomologacionAdmin(admin.ModelAdmin):
+    list_display = (
+        'mensaje_error',
+        'tipo_practica',
+        'codigo_practica',
+        'nombre_practica',
+        'obs_practica',
+        'tipo_homologado',
+        'codigo_homologado',
+        'convenio',
+    )
 
 
 @admin.register(ImportarPracticas)
