@@ -147,7 +147,7 @@ class ImportarPracticas(SubirExcel):
             self.prestador,
         )
 
-    def clen(self):
+    def clean(self):
         if self.columna_tipo is None \
                 or self.columna_tipo < 0:
             raise ValidationError(
