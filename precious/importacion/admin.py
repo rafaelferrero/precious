@@ -52,6 +52,7 @@ class ErrorImportacionHomologacionAdmin(admin.ModelAdmin):
     )
     actions = [export_data]
 
+
 @admin.register(ImportarPracticas)
 class ImportarPracticasAdmin(admin.ModelAdmin):
     actions_on_bottom = True

@@ -217,6 +217,8 @@ class ImportarPracticas(SubirExcel):
                 )
 
     def save(self, *args, **kwargs):
+        import pdb
+        pdb.set_trace()
         super(ImportarPracticas, self).save(*args, **kwargs)
         records = iter(
             pe.get_sheet(
@@ -383,3 +385,5 @@ class ImportarHomologacion(SubirExcel):
     class Meta:
         verbose_name = _("Importar Homologación en formato Excel (.xls)")
         verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
+
+    # TODO: Importar precios iniciales para un convenio
