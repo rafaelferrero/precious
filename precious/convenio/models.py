@@ -145,7 +145,7 @@ class Detalle(models.Model):
     )
 
     class Meta:
-        abstract = True
+        # abstract = True
         ordering = ('convenio',)
 
 

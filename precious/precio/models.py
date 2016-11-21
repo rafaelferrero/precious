@@ -1,9 +1,10 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
-from datetime import datetime
+# from datetime import datetime
+from django.utils import timezone
 # from django.db.models import Q
-from precious.precious.convenio.models import (
+from convenio.models import (
     Prestador,
     Detalle,
 )
@@ -18,7 +19,7 @@ class SolicitudAumento(models.Model):
     )
 
     vigencia_desde = models.DateField(
-        default=datetime.today(),
+        default=timezone.now,
     )
     vigencia_hasta = models.DateField(
         null=True,
