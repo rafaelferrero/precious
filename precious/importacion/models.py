@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
+import django_excel as excel
 from django.core.exceptions import (
     ValidationError,
     ObjectDoesNotExist,
@@ -15,6 +16,84 @@ from convenio.models import (
 )
 import pyexcel as pe
 import pdb
+
+
+class ErrorImportacion(models.Model):
+    mensaje_error = models.TextField(
+        max_length=1000,
+        blank=True,
+        null=True,
+        default="",
+    )
+    tipo_practica = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    codigo_practica = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    nombre_practica = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    obs_practica = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+
+    class Meta:
+        abstract = True
+
+
+class ErrorImportacionPractica(ErrorImportacion):
+    prestador = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+
+
+class ErrorImportacionHomologacion(ErrorImportacion):
+    convenio = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    tipo_homologado = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    codigo_homologado = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    nombre_homologado = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
+    obs_homologado = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default="",
+    )
 
 
 class SubirExcel(models.Model):
@@ -69,7 +148,7 @@ class ImportarPracticas(SubirExcel):
             self.prestador,
         )
 
-    def clen(self):
+    def clean(self):
         if self.columna_tipo is None \
                 or self.columna_tipo < 0:
             raise ValidationError(
@@ -94,9 +173,15 @@ class ImportarPracticas(SubirExcel):
                         prestador=self.prestador,
                     )
                 except MultipleObjectsReturned:
-                    print("Tipos de Prácticas repetidos encontrados para "
-                          "un mismo prestador: {0}".format(r[self.columna_tipo]))
-                    print(t)
+                    ErrorImportacionPractica.objects.create(
+                        mensaje_error="Tipos de Prácticas repetidos encontrados "
+                                      "para un mismo prestador: {0}".format(r[self.columna_tipo]),
+                        tipo_practica=r[self.columna_tipo],
+                        codigo_practica=codigo,
+                        nombre_practica=nombre,
+                        obs_practica=obs,
+                        prestador=self.prestador,
+                    )
                     t = TipoPractica.objects.filter(
                         tipo=r[self.columna_tipo],
                         prestador=self.prestador,
@@ -113,12 +198,27 @@ class ImportarPracticas(SubirExcel):
                     },
                 )
                 if not created:
-                    print("Error!! Código repetido {0}-{1}".format(codigo, nombre))
-                    print(obj)
+                    ErrorImportacionPractica.objects.create(
+                        mensaje_error="Error!! Código repetido {0}-{1}".format(codigo, nombre),
+                        tipo_practica=r[self.columna_tipo],
+                        codigo_practica=codigo,
+                        nombre_practica=nombre,
+                        obs_practica=obs,
+                        prestador=self.prestador,
+                    )
             except MultipleObjectsReturned:
-                print("Códigos repetidos encontrados en un mismo prestador: {0}".format(codigo))
+                ErrorImportacionPractica.objects.create(
+                    mensaje_error="Códigos repetidos encontrados en un mismo prestador: {0}".format(codigo),
+                    tipo_practica=r[self.columna_tipo],
+                    codigo_practica=codigo,
+                    nombre_practica=nombre,
+                    obs_practica=obs,
+                    prestador=self.prestador,
+                )
 
     def save(self, *args, **kwargs):
+        import pdb
+        pdb.set_trace()
         super(ImportarPracticas, self).save(*args, **kwargs)
         records = iter(
             pe.get_sheet(
@@ -188,7 +288,6 @@ class ImportarHomologacion(SubirExcel):
     def subir_homologacion_codigos(self, records):
         for r in records:
             try:
-                # pdb.set_trace()
                 t = TipoPractica.objects.get(
                     tipo=r[self.columna_tipo],
                     prestador=self.convenio.prestador,
@@ -204,7 +303,15 @@ class ImportarHomologacion(SubirExcel):
                     tipo=t,
                 )
             except ObjectDoesNotExist:
-                print("ERROR! No se encuentra el Código indicado: {0}".format(r[self.columna_codigo]))
+                ErrorImportacionHomologacion.objects.create(
+                    mensaje_error="No se encuentra el Código de práctica a homologar:"
+                                  " {0}".format(r[self.columna_codigo]),
+                    tipo_practica=r[self.columna_tipo],
+                    codigo_practica=r[self.columna_codigo],
+                    tipo_homologado=r[self.columna_tipo_homologado],
+                    codigo_homologado=r[self.columna_codigo_homologado],
+                    convenio=self.convenio,
+                )
                 codigo = None
 
             if r[self.columna_codigo_homologado] is not None \
@@ -225,7 +332,15 @@ class ImportarHomologacion(SubirExcel):
                         tipo=t,
                     )
                 except ObjectDoesNotExist:
-                    print("Homologado: {0}".format(r[self.columna_codigo_homologado]))
+                    ErrorImportacionHomologacion.objects.create(
+                        mensaje_error="No se encuentra el Código homologado:"
+                                      " {0}".format(r[self.columna_codigo]),
+                        tipo_practica=r[self.columna_tipo],
+                        codigo_practica=r[self.columna_codigo],
+                        tipo_homologado=r[self.columna_tipo_homologado],
+                        codigo_homologado=r[self.columna_codigo_homologado],
+                        convenio=self.convenio,
+                    )
             else:
                 homologado = None
 
@@ -237,10 +352,24 @@ class ImportarHomologacion(SubirExcel):
                         codigo_homologado=homologado,
                     )
                     if not created:
-                        print("Error!! Código repetido {0}-{1}".format(codigo, homologado))
-                        print(obj)
+                        ErrorImportacionHomologacion.objects.create(
+                            mensaje_error="Error!! Código repetido {0}-{1}".format(codigo, homologado),
+                            tipo_practica=r[self.columna_tipo],
+                            codigo_practica=r[self.columna_codigo],
+                            tipo_homologado=r[self.columna_tipo_homologado],
+                            codigo_homologado=r[self.columna_codigo_homologado],
+                            convenio=self.convenio,
+                        )
                 except MultipleObjectsReturned:
-                    print("ERROR!! Códigos repetidos encontrados en un mismo convenio: {0}".format(codigo))
+                    ErrorImportacionHomologacion.objects.create(
+                        mensaje_error="ERROR!! Códigos repetidos encontrados en un mismo "
+                                      "convenio: {0}".format(codigo),
+                        tipo_practica=r[self.columna_tipo],
+                        codigo_practica=r[self.columna_codigo],
+                        tipo_homologado=r[self.columna_tipo_homologado],
+                        codigo_homologado=r[self.columna_codigo_homologado],
+                        convenio=self.convenio,
+                    )
 
     def save(self, *args, **kwargs):
         super(ImportarHomologacion, self).save(*args, **kwargs)
@@ -256,3 +385,5 @@ class ImportarHomologacion(SubirExcel):
     class Meta:
         verbose_name = _("Importar Homologación en formato Excel (.xls)")
         verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
+
+    # TODO: Importar precios iniciales para un convenio

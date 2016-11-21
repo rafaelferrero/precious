@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
+import django_excel as excel
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from .models import (
@@ -32,6 +33,16 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
+def export_data(modeladmin, request, queryset):
+    return excel.make_response_from_query_sets(
+        queryset,
+        modeladmin.list_display,
+        'xls',
+        file_name="errores"
+    )
+export_data.short_description = _("Exportar a excel")
+
+
 @admin.register(TipoPractica)
 class TipoPracticaAdmin(admin.ModelAdmin):
     actions_on_bottom = True
@@ -45,6 +56,7 @@ class TipoPracticaAdmin(admin.ModelAdmin):
     list_filter = (
         'prestador',
     )
+    actions = [export_data]
 
 
 @admin.register(Prestador)
@@ -77,6 +89,7 @@ class ArancelPracticaAdmin(admin.ModelAdmin):
         'prestador',
         'descripcion',
     )
+    actions = [export_data]
 
 
 @admin.register(CodigoPractica)
@@ -105,6 +118,7 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
         'nombre',
         'observacion',
     )
+    actions = [export_data]
 
 
 @admin.register(Convenio)
@@ -113,6 +127,7 @@ class ConvenioAdmin(admin.ModelAdmin):
     list_display = ('prestador', 'fecha_inicio',)
     search_fields = ('prestador',)
     date_hierarchy = 'fecha_inicio'
+    actions = [export_data]
 
 
 def get_nombre_prestador(request):
@@ -155,6 +170,7 @@ class DetalleArancelAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
+    actions = [export_data]
 
 
 @admin.register(DetalleCodigo)
@@ -187,3 +203,4 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
+    actions = [export_data]
