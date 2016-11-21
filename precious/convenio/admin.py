@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
+import django_excel as excel
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from .models import (
@@ -9,12 +10,9 @@ from .models import (
     CodigoPractica,
     DetalleArancel,
     DetalleCodigo,
-    ImportarPracticas,
-    ImportarHomologacion,
     Usuario,
     TipoPractica,
 )
-import pdb
 
 
 # Define an inline admin descriptor for Employee model
@@ -33,6 +31,22 @@ class UserAdmin(BaseUserAdmin):
 # Re-register UserAdmin
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+
+
+def export_homologacion(modeladmin, request, queryset):
+    q = queryset.values(
+        'codigo_prestador__tipo__tipo',
+        'codigo_prestador__codigo',
+        'codigo_prestador__nombre',
+        'codigo_homologado__tipo__tipo',
+        'codigo_homologado__codigo',
+        'codigo_homologado__nombre')
+    return excel.make_response_from_records(
+        q,
+        'xls',
+        file_name="homologacion"
+    )
+export_homologacion.short_description = _("Exportar a homologacion a excel")
 
 
 @admin.register(TipoPractica)
@@ -158,6 +172,7 @@ class DetalleArancelAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
+    actions = [export_homologacion]
 
 
 @admin.register(DetalleCodigo)
@@ -190,36 +205,4 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
-
-
-@admin.register(ImportarPracticas)
-class ImportarPracticasAdmin(admin.ModelAdmin):
-    actions_on_bottom = True
-    list_display = (
-        'archivo',
-        'prestador',
-    )
-    exclude = ('creator', 'updater')
-
-    def save_model(self, request, obj, form, change):
-        if getattr(obj, 'creator', None) is None:
-            obj.creator = request.user
-        obj.updater = request.user
-        obj.save()
-
-
-@admin.register(ImportarHomologacion)
-class ImportarHomologacionAdmin(admin.ModelAdmin):
-    actions_on_bottom = True
-    list_display = (
-        'archivo',
-        'prestador',
-    )
-    exclude = ('creator', 'updater')
-
-    def save_model(self, request, obj, form, change):
-        if getattr(obj, 'creator', None) is None:
-            obj.creator = request.user
-        obj.updater = request.user
-        obj.save()
-
+    actions = [export_homologacion]
