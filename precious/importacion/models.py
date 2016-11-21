@@ -217,8 +217,6 @@ class ImportarPracticas(SubirExcel):
                 )
 
     def save(self, *args, **kwargs):
-        import pdb
-        pdb.set_trace()
         super(ImportarPracticas, self).save(*args, **kwargs)
         records = iter(
             pe.get_sheet(

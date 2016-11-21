@@ -33,14 +33,20 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
-def export_data(modeladmin, request, queryset):
-    return excel.make_response_from_query_sets(
-        queryset,
-        modeladmin.list_display,
+def export_homologacion(modeladmin, request, queryset):
+    q = queryset.values(
+        'codigo_prestador__tipo__tipo',
+        'codigo_prestador__codigo',
+        'codigo_prestador__nombre',
+        'codigo_homologado__tipo__tipo',
+        'codigo_homologado__codigo',
+        'codigo_homologado__nombre')
+    return excel.make_response_from_records(
+        q,
         'xls',
-        file_name="errores"
+        file_name="homologacion"
     )
-export_data.short_description = _("Exportar a excel")
+export_homologacion.short_description = _("Exportar a homologacion a excel")
 
 
 @admin.register(TipoPractica)
@@ -56,7 +62,6 @@ class TipoPracticaAdmin(admin.ModelAdmin):
     list_filter = (
         'prestador',
     )
-    actions = [export_data]
 
 
 @admin.register(Prestador)
@@ -89,7 +94,6 @@ class ArancelPracticaAdmin(admin.ModelAdmin):
         'prestador',
         'descripcion',
     )
-    actions = [export_data]
 
 
 @admin.register(CodigoPractica)
@@ -118,7 +122,6 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
         'nombre',
         'observacion',
     )
-    actions = [export_data]
 
 
 @admin.register(Convenio)
@@ -127,7 +130,6 @@ class ConvenioAdmin(admin.ModelAdmin):
     list_display = ('prestador', 'fecha_inicio',)
     search_fields = ('prestador',)
     date_hierarchy = 'fecha_inicio'
-    actions = [export_data]
 
 
 def get_nombre_prestador(request):
@@ -170,7 +172,7 @@ class DetalleArancelAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
-    actions = [export_data]
+    actions = [export_homologacion]
 
 
 @admin.register(DetalleCodigo)
@@ -203,4 +205,4 @@ class DetalleCodigoAdmin(admin.ModelAdmin):
     list_filter = (
         'convenio',
     )
-    actions = [export_data]
+    actions = [export_homologacion]

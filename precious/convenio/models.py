@@ -126,6 +126,13 @@ class Convenio(models.Model):
         verbose_name=_("Fecha de inicio del convenio"),
     )
 
+    @property
+    def convenio(self):
+        return "{0} ({1})".format(
+            self.prestador,
+            self.fecha_inicio
+        )
+
     def __str__(self):
         return "{0} ({1})".format(
             self.prestador,
