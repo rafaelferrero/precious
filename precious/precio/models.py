@@ -2,6 +2,8 @@ from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.dispatch import receiver
+from django.db.models.signals import post_save
 from django.db.models import Q
 from convenio.models import (
     Prestador,
@@ -9,6 +11,7 @@ from convenio.models import (
 )
 from django.core.exceptions import (
     ValidationError,
+    ObjectDoesNotExist,
 )
 
 
@@ -131,19 +134,12 @@ class SolicitudAumento(models.Model):
         if solicitudes:
             solicitudes.update(vigencia_hasta=self.vigencia_desde)
 
-    def ejecutar_aumento(self):
-        convenio = Detalle.objects.filter(
-            convenio__prestador=self.prestador)
-        ultima_solicitud = SolicitudAumento.objects.filter(
-            vigencia_hasta__isnull=False).order_by('-vigencia_hasta')[0:1]
-
     def save(self, *args, **kwargs):
         self.estado = self.cambio_estado()
         if self.prestador is None:
             self.prestador = self.creator.usuario.prestador
         if self.estado == 'A':
             self.cierre_vigencia()
-            self.ejecutar_aumento()
         super(SolicitudAumento, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -163,7 +159,7 @@ class Precio(models.Model):
         Detalle,
     )
     solicitud = models.ForeignKey(
-        SolicitudAumento
+        SolicitudAumento,
     )
     importe = models.DecimalField(
         max_digits=11,
@@ -171,13 +167,43 @@ class Precio(models.Model):
         default=0,
     )
 
-    @property
+    class Meta:
+        unique_together = (('detalle', 'solicitud'),)
+
     def __str__(self):
-        return "${0} ${1} (vigencia: {3})".format(
-            self.solicitud.prestador,
+        return "{0} ${1} (vigencia: {2})".format(
+            self.detalle,
             self.importe,
             self.solicitud.vigencia,
         )
+
+    @receiver(post_save, sender=SolicitudAumento)
+    def ejecutar_aumento(sender, **kwargs):
+        if kwargs.get('created', False):
+            convenio = Detalle.objects.filter(
+                convenio__prestador=kwargs['instance'].prestador)
+            ultima_solicitud = SolicitudAumento.objects.filter(
+                vigencia_hasta__isnull=False,
+                prestador=kwargs['instance'].prestador,
+            ).order_by('-vigencia_hasta')[0:1]
+            for codigo in convenio:
+                try:
+                    precio_anterior = Precio.objects.get(
+                        solicitud=ultima_solicitud,
+                        detalle=codigo,
+                    )
+                except ObjectDoesNotExist:
+                    print("El codigo {0} no estaba valorizado, hacer a mano".format(
+                        codigo
+                    ))
+                    precio_anterior = None
+
+                if precio_anterior:
+                    Precio.objects.create(
+                        solicitud=kwargs['instance'],
+                        detalle=codigo,
+                        importe=precio_anterior.importe * (1 + kwargs['instance'].porcentaje_aumento / 100)
+                    )
 
     # TODO: Importe vigente en funcion del detalle
     # TODO: Importe vigente en funcion de la fecha y el detalle

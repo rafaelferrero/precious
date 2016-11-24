@@ -86,6 +86,10 @@ class ArancelPracticaAdmin(admin.ModelAdmin):
             'fields': ('observacion',),
         })
     )
+    list_display = (
+        'nombre',
+        'prestador',
+    )
     list_filter = (
         'prestador',
     )
@@ -112,6 +116,12 @@ class CodigoPracticaAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
             'fields': ('observacion',),
         })
+    )
+    list_display = (
+        'tipo',
+        'codigo',
+        'nombre',
+        'prestador',
     )
     list_filter = (
         'prestador',

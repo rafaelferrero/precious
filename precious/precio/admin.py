@@ -3,6 +3,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
 from .models import (
     SolicitudAumento,
+    Precio,
 )
 
 
@@ -12,6 +13,11 @@ def autorizar(modeladmin, request, queryset):
         obj.updater = request.user
         obj.save()
 autorizar.short_description = _("Autorizar Solicitudes")
+
+
+@admin.register(Precio)
+class PrecioAdmin(admin.ModelAdmin):
+    pass
 
 
 @admin.register(SolicitudAumento)

@@ -89,6 +89,14 @@ class CodigoPractica(Practica):
     )
 
     def __str__(self):
+        return "{0} - {1} - {2}".format(
+            self.tipo,
+            self.codigo,
+            self.nombre,
+        )
+
+    @property
+    def nombre_completo(self):
         return "{0} - {1} - {2} - {3}".format(
             self.tipo,
             self.codigo,
@@ -151,6 +159,15 @@ class Detalle(models.Model):
         verbose_name=_("Convenio"),
     )
 
+    def __str__(self):
+        try:
+            if hasattr(self, 'detallearancel'):
+                return "{0}".format(self.detallearancel)
+            elif hasattr(self, 'detallecodigo'):
+                return "{0}".format(self.detallecodigo)
+        except NotImplementedError:
+            return _("ERROR! Esto no es un detalle de convenio")
+
     class Meta:
         # abstract = True
         ordering = ('convenio',)
@@ -171,6 +188,13 @@ class DetalleArancel(Detalle):
     )
 
     def __str__(self):
+        return "{0} - {1}".format(
+            self.convenio,
+            self.arancel_prestador,
+        )
+
+    @property
+    def homologacion(self):
         return "{0} - {1} homologa a {1}".format(
             self.convenio,
             self.arancel_prestador,
@@ -199,6 +223,13 @@ class DetalleCodigo(Detalle):
     )
 
     def __str__(self):
+        return "{0} - {1}".format(
+            self.convenio,
+            self.codigo_prestador,
+        )
+
+    @property
+    def homologacion(self):
         return "{0} - {1} homologa a {1}".format(
             self.convenio,
             self.codigo_prestador,
