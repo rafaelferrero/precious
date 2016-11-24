@@ -217,15 +217,13 @@ class ImportarPracticas(SubirExcel):
                 )
 
     def save(self, *args, **kwargs):
-        super(ImportarPracticas, self).save(*args, **kwargs)
         records = iter(
             pe.get_sheet(
                 file_name=self.archivo.path))
-
         if self.fila_titulo:
             next(records)
-
         self.subir_codigos_prestador(records)
+        super(ImportarPracticas, self).save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Importar Prácticas en formato Excel (.xls)")
@@ -370,7 +368,6 @@ class ImportarHomologacion(SubirExcel):
                     )
 
     def save(self, *args, **kwargs):
-        super(ImportarHomologacion, self).save(*args, **kwargs)
         records = iter(
             pe.get_sheet(
                 file_name=self.archivo.path))
@@ -379,6 +376,7 @@ class ImportarHomologacion(SubirExcel):
             next(records)
 
         self.subir_homologacion_codigos(records)
+        super(ImportarHomologacion, self).save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Importar Homologación en formato Excel (.xls)")

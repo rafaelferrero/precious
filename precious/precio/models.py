@@ -1,12 +1,14 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
-# from datetime import datetime
 from django.utils import timezone
-# from django.db.models import Q
+from django.db.models import Q
 from convenio.models import (
     Prestador,
     Detalle,
+)
+from django.core.exceptions import (
+    ValidationError,
 )
 
 
@@ -29,27 +31,30 @@ class SolicitudAumento(models.Model):
         max_digits=5,
         decimal_places=2,
     )
+    aceptado = models.BooleanField(
+        default=False,
+    )
     # OCULTOS
+    prestador = models.ForeignKey(
+        Prestador,
+        null=True,
+        blank=True,
+    )
     estado = models.CharField(
         max_length=1,
         choices=ESTADOS,
         default=ESTADOS[0][0],
     )
-    aceptado = models.BooleanField(
-        default=False,
-    )
     creator = models.ForeignKey(
         User,
         blank=True,
         null=True,
-        on_delete=models.SET_NULL,
         related_name="solicitud_creador",
     )
     updater = models.ForeignKey(
         User,
         blank=True,
         null=True,
-        on_delete=models.SET_NULL,
         related_name="solicitud_modificador",
     )
     fecha_creacion = models.DateTimeField(
@@ -62,9 +67,37 @@ class SolicitudAumento(models.Model):
     # TODO: hacer el clean, porcentaje no puede ser mayor a 100,00
     #   Tambien se debe controlar que no exista una solicitud repetida
     #   para el prestador en un mismo periodo de tiempo.
+    @property
+    def solicitud(self):
+        if self.estado == 'A':
+            estado = "Autorizada"
+        else:
+            estado = "Pendiente de aprobación"
+        return "Solicitud Nro. {0} {1} de {2}".format(
+            self.pk,
+            estado,
+            self.prestador,
+        )
+
+    @property
+    def vigencia(self):
+        vigencia = "vigente desde "
+        if self.vigencia_hasta:
+            vigencia += "{0} a {1}".format(
+                self.vigencia_desde,
+                self.vigencia_hasta,
+            )
+        else:
+            vigencia += "{0}".format(
+                self.vigencia_desde,
+            )
+        return vigencia
 
     def cambio_estado(self):
-        if self.pk:
+        if self.creator.is_staff and self.aceptado and \
+                self.creator.usuario.prestador.nombre == "Gecros":
+            rta = 'A'
+        elif self.pk:
             if self.creator == self.updater:
                 if self.aceptado:
                     rta = 'C'
@@ -79,43 +112,50 @@ class SolicitudAumento(models.Model):
             rta = 'P'
         return rta
 
-    def save(self, *args, **kwargs):
-        super(SolicitudAumento, self).save(*args, **kwargs)
-        self.estado = self.cambio_estado()
-        if self.estado == 'A':
-            print("ahora hay que ponerle los precios a los codigos")
+    def clean(self):
+        solicitud = SolicitudAumento.objects.filter(prestador=self.prestador)
+        solicitud = solicitud.filter(vigencia_desde__gte=self.vigencia_desde)
+        solicitud = solicitud.count()
+        if solicitud > 0:
+            raise ValidationError(
+                {'vigencia_desde':
+                 _("Ya existe una solicitud con fecha mayor a la indicada")})
 
-    @property
-    def solicitud(self):
-        if autorizada:
-            estado = "Autorizada"
-        else:
-            estado = "Pendiente de aprobación"
-        return "Solicitud Nro. {0} {1} de {2}".format(
-            self.pk,
-            estado,
-            not self.prestador.nombre
+    def cierre_vigencia(self):
+        solicitudes = SolicitudAumento.objects.filter(
+            prestador=self.prestador,
+            vigencia_desde__lt=self.vigencia_desde,
+            vigencia_hasta__isnull=True,
+            estado="A",
         )
+        if solicitudes:
+            solicitudes.update(vigencia_hasta=self.vigencia_desde)
 
-    @property
-    def vigencia(self):
-        if self.vigencia_hasta:
-            vigencia = "{0} a {1}".format(
-                self.vigencia_desde,
-                self.vigencia_hasta,
-            )
-        else:
-            vigencia = "vigente desde {0}".format(
-                self.vigencia_desde,
-            )
-        return vigencia
+    def ejecutar_aumento(self):
+        convenio = Detalle.objects.filter(
+            convenio__prestador=self.prestador)
+        ultima_solicitud = SolicitudAumento.objects.filter(
+            vigencia_hasta__isnull=False).order_by('-vigencia_hasta')[0:1]
+
+    def save(self, *args, **kwargs):
+        self.estado = self.cambio_estado()
+        if self.prestador is None:
+            self.prestador = self.creator.usuario.prestador
+        if self.estado == 'A':
+            self.cierre_vigencia()
+            self.ejecutar_aumento()
+        super(SolicitudAumento, self).save(*args, **kwargs)
 
     def __str__(self):
-        return "{0} - Aumento {1}% desde el {2}".format(
+        return "{0} - Aumento {1}% - {2}".format(
             self.solicitud,
-            self.porcentaje,
+            self.porcentaje_aumento,
             self.vigencia,
         )
+
+    class Meta:
+        verbose_name = _("Solicitud de Aumento")
+        verbose_name_plural = _("Solicitudes de Aumento")
 
 
 class Precio(models.Model):
@@ -133,7 +173,8 @@ class Precio(models.Model):
 
     @property
     def __str__(self):
-        return "${0} (vigencia: {1})".format(
+        return "${0} ${1} (vigencia: {3})".format(
+            self.solicitud.prestador,
             self.importe,
             self.solicitud.vigencia,
         )
