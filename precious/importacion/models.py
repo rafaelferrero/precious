@@ -14,6 +14,10 @@ from convenio.models import (
     DetalleCodigo,
     Convenio,
 )
+from precio.models import (
+    SolicitudAumento,
+    Precio,
+)
 import pyexcel as pe
 import pdb
 
@@ -382,4 +386,75 @@ class ImportarHomologacion(SubirExcel):
         verbose_name = _("Importar Homologación en formato Excel (.xls)")
         verbose_name_plural = _("Importar Homologación en formato Excel (.xls)")
 
-    # TODO: Importar precios iniciales para un convenio
+
+class ImportarPreciosInicialesCodigos(SubirExcel):
+    convenio = models.ForeignKey(Convenio)
+    columna_precio = models.DecimalField(
+        verbose_name=_("Columna de Precios del Código de Práctica"),
+        decimal_places=2,
+        max_digits=11,
+    )
+
+    def importar_precios(self, records):
+        try:
+            solicitud = SolicitudAumento.objects.get(
+                prestador=self.convenio.prestador,
+            )
+        except ObjectDoesNotExist:
+            solicitud = SolicitudAumento.objects.get_or_create(
+                aceptado=True,
+                porcentaje_aumento=0,
+                prestador=self.convenio.prestador
+            )
+        except MultipleObjectsReturned:
+            raise ValidationError(
+                "El prestador {0} ya tiene convenios cargados".format(self.convenio.prestador)
+            )
+
+        for r in records:
+            try:
+                t = TipoPractica.objects.get(
+                    tipo=r[self.columna_tipo],
+                    prestador=self.convenio.prestador,
+                )
+            except ObjectDoesNotExist:
+                raise ValidationError(
+                    "ERROR! No se encuentra el tipo indicado: {0}".format(r[self.columna_tipo]))
+
+            try:
+                detalle = Detalle.objects.get(
+                    convenio=self.convenio,
+                    detallecodigo__codigo_prestador__tipo=t,
+                    detallecodigo__codigo_prestador__codigo=r[self.columna_codigo],
+                    detallecodigo__codigo_prestador__prestador=self.convenio.prestador,
+                )
+            except ObjectDoesNotExist:
+                raise ValidationError(
+                    "ERROR! No se encuentra el codigo indicado: {0}".format(r[self.columna_codigo]))
+
+            Precio.objects.create(
+                detalle=detalle,
+                solicitud=solicitud,
+                importe=r[self.columna_precio],
+            )
+
+    def save(self, *args, **kwargs):
+        records = iter(
+            pe.get_sheet(
+                file_name=self.archivo.path))
+
+        if self.fila_titulo:
+            next(records)
+
+        self.importar_precios(records)
+        super(ImportarPreciosIniciales, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return "{0} - {1}".format(
+            self.archivo,
+            self.convenio,
+        )
+
+    class Meta:
+        verbose_name = _("Importar Precio Inicial en formato Excel (.xls)")
+        verbose_name_plural = _("Importar Precios Iniciales en formato Excel (.xls)")

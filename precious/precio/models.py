@@ -37,7 +37,6 @@ class SolicitudAumento(models.Model):
     aceptado = models.BooleanField(
         default=False,
     )
-    # OCULTOS
     prestador = models.ForeignKey(
         Prestador,
         null=True,
@@ -67,9 +66,6 @@ class SolicitudAumento(models.Model):
         auto_now=True,
     )
 
-    # TODO: hacer el clean, porcentaje no puede ser mayor a 100,00
-    #   Tambien se debe controlar que no exista una solicitud repetida
-    #   para el prestador en un mismo periodo de tiempo.
     @property
     def solicitud(self):
         if self.estado == 'A':
@@ -115,15 +111,6 @@ class SolicitudAumento(models.Model):
             rta = 'P'
         return rta
 
-    def clean(self):
-        solicitud = SolicitudAumento.objects.filter(prestador=self.prestador)
-        solicitud = solicitud.filter(vigencia_desde__gte=self.vigencia_desde)
-        solicitud = solicitud.count()
-        if solicitud > 0:
-            raise ValidationError(
-                {'vigencia_desde':
-                 _("Ya existe una solicitud con fecha mayor a la indicada")})
-
     def cierre_vigencia(self):
         solicitudes = SolicitudAumento.objects.filter(
             prestador=self.prestador,
@@ -133,6 +120,15 @@ class SolicitudAumento(models.Model):
         )
         if solicitudes:
             solicitudes.update(vigencia_hasta=self.vigencia_desde)
+
+    def clean(self):
+        solicitud = SolicitudAumento.objects.filter(
+            prestador=self.prestador,
+            vigencia_desde__gte=self.vigencia_desde,).count()
+        if solicitud > 0:
+            raise ValidationError(
+                {'vigencia_desde':
+                 _("Ya existe una solicitud con fecha mayor a la indicada")})
 
     def save(self, *args, **kwargs):
         self.estado = self.cambio_estado()
@@ -204,6 +200,3 @@ class Precio(models.Model):
                         detalle=codigo,
                         importe=precio_anterior.importe * (1 + kwargs['instance'].porcentaje_aumento / 100)
                     )
-
-    # TODO: Importe vigente en funcion del detalle
-    # TODO: Importe vigente en funcion de la fecha y el detalle
