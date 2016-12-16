@@ -4,6 +4,7 @@ import django_excel as excel
 from .models import (
     ImportarPracticas,
     ImportarHomologacion,
+    ImportarPreciosInicialesCodigos,
     ErrorImportacionPractica,
     ErrorImportacionHomologacion,
 )
@@ -71,6 +72,22 @@ class ImportarPracticasAdmin(admin.ModelAdmin):
 
 @admin.register(ImportarHomologacion)
 class ImportarHomologacionAdmin(admin.ModelAdmin):
+    actions_on_bottom = True
+    list_display = (
+        'archivo',
+        'convenio',
+    )
+    exclude = ('creator', 'updater')
+
+    def save_model(self, request, obj, form, change):
+        if getattr(obj, 'creator', None) is None:
+            obj.creator = request.user
+        obj.updater = request.user
+        obj.save()
+
+
+@admin.register(ImportarPreciosInicialesCodigos)
+class ImportarPreciosAdmin(admin.ModelAdmin):
     actions_on_bottom = True
     list_display = (
         'archivo',

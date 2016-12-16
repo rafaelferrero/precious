@@ -13,6 +13,7 @@ from convenio.models import (
     CodigoPractica,
     DetalleCodigo,
     Convenio,
+    Detalle,
 )
 from precio.models import (
     SolicitudAumento,
@@ -314,6 +315,7 @@ class ImportarHomologacion(SubirExcel):
                 )
                 codigo = None
 
+            # homologado = None
             if r[self.columna_codigo_homologado] is not None \
                     and r[self.columna_codigo_homologado] != "":
                 try:
@@ -387,10 +389,22 @@ class ImportarHomologacion(SubirExcel):
 
 class ImportarPreciosInicialesCodigos(SubirExcel):
     convenio = models.ForeignKey(Convenio)
-    columna_precio = models.DecimalField(
+    columna_precio = models.IntegerField(
         verbose_name=_("Columna de Precios del Código de Práctica"),
-        decimal_places=2,
-        max_digits=11,
+    )
+    creator = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="ImportarPrecios_creador"
+    )
+    updater = models.ForeignKey(
+        User,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="ImportarPrecios_modificador",
     )
 
     def importar_precios(self, records):
@@ -402,18 +416,19 @@ class ImportarPreciosInicialesCodigos(SubirExcel):
             solicitud = SolicitudAumento.objects.get_or_create(
                 aceptado=True,
                 porcentaje_aumento=0,
-                prestador=self.convenio.prestador
+                prestador=self.convenio.prestador,
+                creator=self.creator,
+                updater=self.updater,
             )
         except MultipleObjectsReturned:
             raise ValidationError(
                 "El prestador {0} ya tiene convenios cargados".format(self.convenio.prestador)
             )
-
         for r in records:
             try:
                 t = TipoPractica.objects.get(
                     tipo=r[self.columna_tipo],
-                    prestador=self.convenio.prestador,
+                    prestador=self.creator.usuario.prestador,
                 )
             except ObjectDoesNotExist:
                 raise ValidationError(
@@ -422,22 +437,29 @@ class ImportarPreciosInicialesCodigos(SubirExcel):
             try:
                 detalle = Detalle.objects.get(
                     convenio=self.convenio,
-                    detallecodigo__codigo_prestador__tipo=t,
-                    detallecodigo__codigo_prestador__codigo=r[self.columna_codigo],
-                    detallecodigo__codigo_prestador__prestador=self.convenio.prestador,
+                    detallecodigo__codigo_homologado__tipo=t,
+                    detallecodigo__codigo_homologado__codigo=r[self.columna_codigo],
+                    detallecodigo__codigo_homologado__prestador=self.creator.usuario.prestador,
                 )
             except ObjectDoesNotExist:
+                import pdb
+                pdb.set_trace()
                 raise ValidationError(
                     "ERROR! No se encuentra el codigo indicado: {0}".format(r[self.columna_codigo]))
+            except MultipleObjectsReturned:
+                import pdb
+                pdb.set_trace()
+                raise ValidationError(
+                    "Multiples objetos {0} ".format(r[self.columna_codigo]))
 
             Precio.objects.create(
                 detalle=detalle,
-                solicitud=solicitud,
+                solicitud=solicitud[0],
                 importe=r[self.columna_precio],
             )
 
     def save(self, *args, **kwargs):
-        super(ImportarPreciosIniciales, self).save(*args, **kwargs)
+        super(ImportarPreciosInicialesCodigos, self).save(*args, **kwargs)
         records = iter(
             pe.get_sheet(
                 file_name=self.archivo.path))

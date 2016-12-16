@@ -94,7 +94,7 @@ class SolicitudAumento(models.Model):
 
     def cambio_estado(self):
         if self.creator.is_staff and self.aceptado and \
-                self.creator.usuario.prestador.nombre == "Gecros":
+                self.creator.usuario.prestador.nombre == "CAMI":
             rta = 'A'
         elif self.pk:
             if self.creator == self.updater:
@@ -131,12 +131,12 @@ class SolicitudAumento(models.Model):
                  _("Ya existe una solicitud con fecha mayor a la indicada")})
 
     def save(self, *args, **kwargs):
+        super(SolicitudAumento, self).save(*args, **kwargs)
         self.estado = self.cambio_estado()
         if self.prestador is None:
             self.prestador = self.creator.usuario.prestador
         if self.estado == 'A':
             self.cierre_vigencia()
-        super(SolicitudAumento, self).save(*args, **kwargs)
 
     def __str__(self):
         return "{0} - Aumento {1}% - {2}".format(
@@ -175,7 +175,8 @@ class Precio(models.Model):
 
     @receiver(post_save, sender=SolicitudAumento)
     def ejecutar_aumento(sender, **kwargs):
-        if kwargs.get('created', False):
+        if kwargs.get('created', False) \
+                and kwargs.get('instance').porcentaje_aumento > 0:
             convenio = Detalle.objects.filter(
                 convenio__prestador=kwargs['instance'].prestador)
             ultima_solicitud = SolicitudAumento.objects.filter(
