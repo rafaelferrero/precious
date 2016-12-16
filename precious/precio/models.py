@@ -125,18 +125,18 @@ class SolicitudAumento(models.Model):
         solicitud = SolicitudAumento.objects.filter(
             prestador=self.prestador,
             vigencia_desde__gte=self.vigencia_desde,).count()
-        if solicitud > 0:
+        if solicitud > 0 and self.id is None:
             raise ValidationError(
                 {'vigencia_desde':
                  _("Ya existe una solicitud con fecha mayor a la indicada")})
 
     def save(self, *args, **kwargs):
-        super(SolicitudAumento, self).save(*args, **kwargs)
         self.estado = self.cambio_estado()
         if self.prestador is None:
             self.prestador = self.creator.usuario.prestador
         if self.estado == 'A':
             self.cierre_vigencia()
+        super(SolicitudAumento, self).save(*args, **kwargs)
 
     def __str__(self):
         return "{0} - Aumento {1}% - {2}".format(
